@@ -75,6 +75,11 @@ By default requests will be passed to the [View API]{@link module:/view} module.
 */
 function requestRouter(req, res) {
   switch (true) {
+    // User API
+    case /(?<=\/api\/user)/.test(req.url):
+      routes.user(req, res);
+      break;
+
     // Provider API
     case /(?<=\/api\/provider)/.test(req.url):
       routes.provider(req, res);
