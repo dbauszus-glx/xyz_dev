@@ -47,6 +47,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import api from './api.js';
+import validateRequestAuth from './mod/utils/validateRequestAuth.js';
 import validateRequestParams from './mod/utils/validateRequestParams.js';
 
 const publicDir = resolve(process.cwd(), 'public');
@@ -81,6 +82,8 @@ app.use((req, res, next) => {
 });
 
 app.use(validateRequestParams);
+
+app.use(validateRequestAuth);
 
 app.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
 
