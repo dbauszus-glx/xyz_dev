@@ -50,8 +50,6 @@ import api from './api.js';
 import validateRequestAuth from './mod/utils/validateRequestAuth.js';
 import validateRequestParams from './mod/utils/validateRequestParams.js';
 
-const publicDir = resolve(process.cwd(), 'public');
-
 if (process.versions.node.split('.')[0] < 22) {
   console.warn(`Process Node version below 22.`);
 }
@@ -83,11 +81,13 @@ app.use((req, res, next) => {
 
 app.use(validateRequestParams);
 
-app.use(validateRequestAuth);
+const publicDir = resolve(process.cwd(), 'public');
 
 app.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
 
 app.use(xyzEnv.DIR, express.static(publicDir));
+
+app.use(validateRequestAuth);
 
 app.get(`${xyzEnv.DIR}/api/provider{/:provider}`, api);
 
