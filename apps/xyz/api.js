@@ -88,13 +88,6 @@ export default function api(req, res) {
   Object.assign(req.params, req._params);
 
   requestRouter(req, res)
- 
-  // if (req.params instanceof Error) {
-  //   return res
-  //     .status(400)
-  //     .setHeader('Content-Type', 'text/plain')
-  //     .send(req.params.message);
-  // }
 
   // if (req.params.logout) {
   //   // Remove cookie.
