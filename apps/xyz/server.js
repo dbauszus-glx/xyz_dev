@@ -43,6 +43,7 @@ RATE_LIMIT_WINDOW - Time window in ms (default: 1 min)
 
 import { resolve } from 'node:path';
 import './mod/utils/processEnv.js';
+import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -69,6 +70,8 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.use(cookieParser());
+app.use(bodyParser.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // redirect if dir is missing in url path.
 app.use((req, res, next) => {
@@ -89,37 +92,37 @@ app.use(xyzEnv.DIR, express.static(publicDir));
 
 app.use(validateRequestAuth);
 
-app.get(`${xyzEnv.DIR}/api/provider{/:provider}`, api);
+app.get(`${xyzEnv.DIR}/api/provider/:provider`, api);
 
 app.post(
-  `${xyzEnv.DIR}/api/provider{/:provider}`,
+  `${xyzEnv.DIR}/api/provider/:provider`,
   express.json({ limit: '5mb' }),
   api,
 );
 
-app.get(`${xyzEnv.DIR || ''}/api/sign{/:signer}`, api);
+app.get(`${xyzEnv.DIR || ''}/api/sign/:signer`, api);
 
-app.get(`${xyzEnv.DIR}/api/query{/:template}`, api);
+app.get(`${xyzEnv.DIR}/api/query/:template`, api);
 
 app.post(
-  `${xyzEnv.DIR}/api/query{/:template}`,
+  `${xyzEnv.DIR}/api/query/:template`,
   express.json({ limit: '5mb' }),
   api,
 );
 
-app.get(`${xyzEnv.DIR}/api/workspace{/:key}`, api);
+app.get(`${xyzEnv.DIR}/api/workspace/:key`, api);
 
-app.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, api);
+app.get(`${xyzEnv.DIR}/api/user/:method/:key`, api);
 
 app.post(
-  `${xyzEnv.DIR}/api/user{/:method}`,
+  `${xyzEnv.DIR}/api/user/:method`,
   [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
   api,
 );
 
-app.get(`${xyzEnv.DIR}/view{/:template}`, api);
+app.get(`${xyzEnv.DIR}/view/:template`, api);
 
-app.get(`${xyzEnv.DIR}{/:locale}`, api);
+app.get(`${xyzEnv.DIR}/:locale`, api);
 
 app.get(`/`, api);
 

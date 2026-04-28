@@ -1,3 +1,4 @@
+import { registerConsoleShortcuts } from 'vitest/node';
 import _user from '../user/_user.js';
 import auth from '../user/auth.js';
 import login from '../user/login.js';
@@ -26,6 +27,8 @@ PRIVATE processes require user auth for all requests and will shortcircuit to th
 export default async function validateRequestAuth(req, res, next) {
   // Assign _params object from validateRequestParams module to req.params.
   Object.assign(req.params, req._params);
+
+  console.log(req.url);
 
   if (req.params.logout) {
     // Remove cookie.
@@ -92,11 +95,19 @@ export default async function validateRequestAuth(req, res, next) {
   req.params.user = user;
   req._params.user = user;
 
-  // // User route
-  // if (req.url.match(/(?<=\/api\/user)/)) {
-  //   //Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
-  //   return _user(req, res);
-  // }
+  // User route
+  if (req.url.match(/(?<=\/api\/user\/login)/)) {
+    req.params.method = 'login';
+    // Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
+    return _user(req, res);
+  }
+
+  // User route
+  if (req.url.match(/(?<=\/api\/user\/cookie)/)) {
+    req.params.method = 'cookie';
+    // Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
+    return _user(req, res);
+  }
 
   // PRIVATE instances require user auth for all requests.
   if (!req.params.user && xyzEnv.PRIVATE) {
