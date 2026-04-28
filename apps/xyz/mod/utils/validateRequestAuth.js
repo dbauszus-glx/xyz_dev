@@ -53,7 +53,7 @@ export default async function validateRequestAuth(req, res, next) {
     return register(req, res);
   }
 
-    // Validate signature of either request token, authorization header, or cookie.
+  // Validate signature of either request token, authorization header, or cookie.
   const user = await auth(req, res);
 
   // // Key authentication generates a response
@@ -111,7 +111,7 @@ export default async function validateRequestAuth(req, res, next) {
     // Redirect to the SAML login.
     if (xyzEnv.SAML_LOGIN) {
       // The redirect for a successful login.
-      setRedirect(req, res);
+      // setRedirect(req, res);
 
       res.setHeader('location', `${xyzEnv.DIR}/saml/login`);
       return res.status(302).send();
