@@ -88,6 +88,16 @@ if (process.env.SECRET_KEY) {
   process.env.SECRET_ALGORITHM ??= 'RS256';
 }
 
+if (process.env.DIR) {
+  // Ensure DIR starts with a slash and does not end with a slash
+  process.env.DIR = process.env.DIR.startsWith('/')
+    ? process.env.DIR
+    : `/${process.env.DIR}`;
+  process.env.DIR = process.env.DIR.endsWith('/')
+    ? process.env.DIR.slice(0, -1)
+    : process.env.DIR;
+}
+
 process.env.COOKIE_TTL ??= defaults.COOKIE_TTL;
 process.env.DIR ??= defaults.DIR;
 process.env.FAILED_ATTEMPTS ??= defaults.FAILED_ATTEMPTS;
