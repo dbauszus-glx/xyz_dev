@@ -95,16 +95,13 @@ export default async function validateRequestAuth(req, res, next) {
   req.params.user = user;
   req._params.user = user;
 
-  // User route
-  if (req.url.match(/(?<=\/api\/user\/login)/)) {
-    req.params.method = 'login';
-    // Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
-    return _user(req, res);
-  }
+  const user_URLPattern = new URLPattern({
+    pathname: `${xyzEnv.DIR}/api/user{/:method}`
+  });
 
-  // User route
-  if (req.url.match(/(?<=\/api\/user\/cookie)/)) {
-    req.params.method = 'cookie';
+  if (user_URLPattern.test(req.url)) {
+    const result = user_URLPattern.exec(req.url);
+    req.params.method = result.pathname.groups.method;
     // Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
     return _user(req, res);
   }
