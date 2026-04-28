@@ -49,7 +49,7 @@ import rateLimit from 'express-rate-limit';
 import api from './api.js';
 import validateRequestParams from './mod/utils/validateRequestParams.js';
 
-const publicDir = resolve(process.cwd(), 'public');
+const publicDir = resolve(xyzEnv.XYZ_CWD || process.cwd(), 'public');
 
 if (process.versions.node.split('.')[0] < 22) {
   console.warn(`Process Node version below 22.`);
@@ -68,6 +68,15 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
+
+// redirect if dir is missing in url path.
+app.use((req, res, next) => {
+  if (xyzEnv.DIR && req.url.length === 1) {
+    res.setHeader('location', `${xyzEnv.DIR}`);
+    return res.status(302).send();
+  }
+  next();
+});
 
 app.use(cookieParser());
 
