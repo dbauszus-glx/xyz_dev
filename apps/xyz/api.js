@@ -86,14 +86,6 @@ All other requests will passed to the async validateRequestAuth method.
 export default function api(req, res) {
   // Assign _params object from validateRequestParams module to req.params.
   Object.assign(req.params, req._params);
-  req.params = validateRequestParams(req);
-
-  if (req.params instanceof Error) {
-    return res
-      .status(400)
-      .setHeader('Content-Type', 'text/plain')
-      .send(req.params.message);
-  }
 
   if (req.params.logout) {
     // Remove cookie.
