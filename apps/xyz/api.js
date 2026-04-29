@@ -49,7 +49,7 @@ import user from './mod/user/_user.js';
 import auth from './mod/user/auth.js';
 import login from './mod/user/login.js';
 import register from './mod/user/register.js';
-import { setRedirect } from './mod/utils/redirect.js';
+import { getRedirect, setRedirect } from './mod/utils/redirect.js';
 import view from './mod/view.js';
 import workspace from './mod/workspace/_workspace.js';
 
@@ -85,6 +85,11 @@ All other requests will passed to the async validateRequestAuth method.
 @property {Boolean} params.register The request should redirect to user/register.
 */
 export default function api(req, res) {
+  //if (getRedirect(req, res)) return;
+  // if (req.url === `${xyzEnv.DIR}/favicon.ico`) {
+  //   return;
+  // };
+
   req.params = validateRequestParams(req);
 
   if (req.params instanceof Error) {
@@ -187,13 +192,13 @@ async function validateRequestAuth(req, res) {
 
   // PRIVATE instances require user auth for all requests.
   if (!req.params.user && xyzEnv.PRIVATE) {
-    // Redirect to the SAML login.
-    if (xyzEnv.SAML_LOGIN) {
-      // The redirect for a successful login.
-      setRedirect(req, res);
 
-      res.setHeader('location', `${xyzEnv.DIR}/saml/login`);
-      return res.status(302).send();
+    setRedirect(req, res);
+
+    if (xyzEnv.AUTH_PATH) {
+      res.setHeader('location', `${xyzEnv.DIR}${xyzEnv.AUTH_PATH}/login`);
+      res.status(302).send();
+      return;
     }
 
     return login(req, res);

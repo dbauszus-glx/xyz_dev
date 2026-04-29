@@ -12,7 +12,6 @@ Exports the login method for the /api/user/login route.
 */
 
 import jsonwebtoken from 'jsonwebtoken';
-import { setRedirect } from '../utils/redirect.js';
 import view from '../view.js';
 import fromACL from './fromACL.js';
 
@@ -81,17 +80,12 @@ The response will be redirected to the location from the redirect cookie. The re
 async function loginBody(req, res) {
   const user = await fromACL(req);
 
-  const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
-
-  // Decode the redirect URL since it's now encoded when stored
-  const decodedRedirect = redirect ? decodeURIComponent(redirect) : null;
-
   if (user instanceof Error) {
     // Return to loginView with a redirect from the loginView form.
-    if (decodedRedirect) {
-      req.params.msg = user.message;
-      return loginView(req, res);
-    }
+    // if (decodedRedirect) {
+    //   req.params.msg = user.message;
+    //   return loginView(req, res);
+    // }
 
     return res
       .status(401)
@@ -116,10 +110,8 @@ async function loginBody(req, res) {
 
   const user_cookie = `${xyzEnv.TITLE}=${token};HttpOnly;Max-Age=${xyzEnv.COOKIE_TTL};Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`;
 
-  const redirect_null_cookie = `${xyzEnv.TITLE}_redirect=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`;
-
-  res.setHeader('Set-Cookie', [user_cookie, redirect_null_cookie]);
-  res.setHeader('location', `${decodedRedirect || xyzEnv.DIR}`);
+  res.setHeader('Set-Cookie', user_cookie);
+  res.setHeader('location', `${xyzEnv.DIR}/`);
   res.status(302).send();
 }
 
@@ -143,8 +135,6 @@ function loginView(req, res) {
     'Set-Cookie',
     `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
   );
-
-  setRedirect(req, res);
 
   req.params.template = 'login_view';
 
