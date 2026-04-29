@@ -193,7 +193,9 @@ async function validateRequestAuth(req, res) {
   // PRIVATE instances require user auth for all requests.
   if (!req.params.user && xyzEnv.PRIVATE) {
 
-    setRedirect(req, res);
+    if (setRedirect(req, res)) {
+      return;
+    }
 
     if (xyzEnv.AUTH_PATH) {
       res.setHeader('location', `${xyzEnv.DIR}${xyzEnv.AUTH_PATH}/login`);

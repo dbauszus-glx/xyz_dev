@@ -26,9 +26,11 @@ The redirect URL is extracted from the request URL, validated, and stored in a c
 @property {function} res.setHeader Set response header function
 */
 export function setRedirect(req, res) {
-  // const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
+  const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
 
-  // if (redirect) return;
+  if (redirect) {
+    return true;
+  }
 
   let redirectUrl =
     req.url && decodeURIComponent(req.url).replace(/login=true/, '');
