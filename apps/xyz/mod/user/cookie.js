@@ -96,10 +96,12 @@ export default async function cookie(req, res) {
         return res.status(500).send('Failed to retrieve user from ACL');
       }
 
-      const user = rows[0];
+      const user = Object.assign({}, rows[0]);
+
+      user.email = payload.email;
 
       // Admin rights should not be added if not provided from a token.
-      user.admin = payload.admin;
+      user.admin &&= payload.admin;
 
       // Assign title identifier to user object.
       user.title = xyzEnv.TITLE;

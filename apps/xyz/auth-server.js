@@ -24,7 +24,6 @@ app.post(
 export default app;
 
 function custom_login(req, res) {
-
   const form = `<form method="POST" action="${xyzEnv.DIR}/custom/verify">
     <input type="text" name="username" placeholder="Username" required />
     <button type="submit">Login</button></form>`;
@@ -52,7 +51,7 @@ function custom_verify(req, res) {
   );
 
   const user_cookie = `${xyzEnv.TITLE}=${token};HttpOnly;Max-Age=${xyzEnv.COOKIE_TTL};Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`;
-  
+
   if (getRedirect(req, res, [user_cookie])) {
     return;
   }

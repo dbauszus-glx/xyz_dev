@@ -85,10 +85,6 @@ All other requests will passed to the async validateRequestAuth method.
 @property {Boolean} params.register The request should redirect to user/register.
 */
 export default function api(req, res) {
-  //if (getRedirect(req, res)) return;
-  // if (req.url === `${xyzEnv.DIR}/favicon.ico`) {
-  //   return;
-  // };
 
   req.params = validateRequestParams(req);
 
@@ -192,7 +188,6 @@ async function validateRequestAuth(req, res) {
 
   // PRIVATE instances require user auth for all requests.
   if (!req.params.user && xyzEnv.PRIVATE) {
-
     if (setRedirect(req, res)) {
       return;
     }

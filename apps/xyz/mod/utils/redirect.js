@@ -61,7 +61,9 @@ export function getRedirect(req, res, cookies = []) {
   // Decode the redirect URL since it's now encoded when stored
   const decodedRedirect = decodeURIComponent(redirect);
 
-  cookies.push(`${xyzEnv.TITLE}_redirect=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`);
+  cookies.push(
+    `${xyzEnv.TITLE}_redirect=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
+  );
 
   res.setHeader('Set-Cookie', cookies);
   res.setHeader('location', decodedRedirect);
