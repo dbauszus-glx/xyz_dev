@@ -14,6 +14,7 @@ Exports the login method for the /api/user/login route.
 import jsonwebtoken from 'jsonwebtoken';
 import view from '../view.js';
 import fromACL from './fromACL.js';
+import { getRedirect, setRedirect } from '../utils/redirect.js';
 
 const { sign } = jsonwebtoken;
 
@@ -82,10 +83,10 @@ async function loginBody(req, res) {
 
   if (user instanceof Error) {
     // Return to loginView with a redirect from the loginView form.
-    // if (decodedRedirect) {
-    //   req.params.msg = user.message;
-    //   return loginView(req, res);
-    // }
+    if (req.cookies?.[`${xyzEnv.TITLE}_redirect`]) {
+      req.params.msg = user.message;
+      return loginView(req, res);
+    }
 
     return res
       .status(401)
@@ -110,6 +111,10 @@ async function loginBody(req, res) {
 
   const user_cookie = `${xyzEnv.TITLE}=${token};HttpOnly;Max-Age=${xyzEnv.COOKIE_TTL};Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`;
 
+  if (getRedirect(req, res, [user_cookie])) {
+    return;
+  }
+
   res.setHeader('Set-Cookie', user_cookie);
   res.setHeader('location', `${xyzEnv.DIR}/`);
   res.status(302).send();
@@ -130,12 +135,6 @@ The default `login_view` will be set as template request parameter before the XY
 @property {Object} req.params HTTP request parameter.
 */
 function loginView(req, res) {
-  // Clear user token cookie.
-  res.setHeader(
-    'Set-Cookie',
-    `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
-  );
-
   req.params.template = 'login_view';
 
   view(req, res);

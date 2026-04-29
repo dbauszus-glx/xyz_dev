@@ -25,7 +25,11 @@ The redirect URL is extracted from the request URL, validated, and stored in a c
 @param {res} res HTTP response object
 @property {function} res.setHeader Set response header function
 */
-export function setRedirect(req, res) {
+export function setRedirect(req, res, cookies = []) {
+  if (req.url === `${xyzEnv.DIR}/`) {
+    return;
+  }
+
   const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
 
   if (redirect) {
@@ -46,11 +50,16 @@ export function setRedirect(req, res) {
   // Encode the URL for safe storage in the cookie
   const encodedRedirectUrl = encodeURIComponent(redirectUrl);
 
-  // Set cookie with properly encoded redirect value.
-  res.setHeader(
-    'Set-Cookie',
+  cookies.push(
+    `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
+  );
+
+  cookies.push(
     `${xyzEnv.TITLE}_redirect=${encodedRedirectUrl};HttpOnly;Max-Age=60000;Path=${xyzEnv.DIR || '/'}`,
   );
+
+  // Set cookie with properly encoded redirect value.
+  res.setHeader('Set-Cookie', cookies);
 }
 
 export function getRedirect(req, res, cookies = []) {
