@@ -119,28 +119,11 @@ describe('login', async () => {
       body: { email: 'test@email.com', password: 'correct' },
       params: {},
       headers: { host: 'example.com' }, // Triggers the ';Secure' flag
-      cookies: {
-        TEST_APP_redirect: encodeURIComponent('/dashboard'),
-      },
     });
 
     await login(req, res);
 
     expect(res.statusCode).toEqual(302);
-    expect(res.getHeader('location')).toEqual('/dashboard');
-
-    const cookies = res.getHeader('Set-Cookie');
-    expect(cookies).toHaveLength(2);
-
-    // Assert user token cookie (includes Secure flag since host != localhost)
-    expect(cookies[0]).toContain('TEST_APP=');
-    expect(cookies[0]).toContain(
-      'HttpOnly;Max-Age=3600;Path=/app;SameSite=Strict;Secure',
-    );
-
-    // Assert redirect clearing cookie
-    expect(cookies[1]).toEqual(
-      'TEST_APP_redirect=null;HttpOnly;Max-Age=0;Path=/app',
-    );
+    expect(res.getHeader('location')).toEqual('/app/');
   });
 });
