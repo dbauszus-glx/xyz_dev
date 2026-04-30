@@ -12,6 +12,7 @@ vi.mock('@geolytix/xyz-app/mod/view.js', () => ({
 }));
 
 vi.mock('@geolytix/xyz-app/mod/utils/redirect.js', () => ({
+  getRedirect: vi.fn(),
   setRedirect: vi.fn(),
 }));
 
@@ -125,7 +126,7 @@ describe('login', async () => {
 
     await login(req, res);
 
-    expect(res.statusCode).toEqual(200);
+    expect(res.statusCode).toEqual(302);
     expect(res.getHeader('location')).toEqual('/dashboard');
 
     const cookies = res.getHeader('Set-Cookie');

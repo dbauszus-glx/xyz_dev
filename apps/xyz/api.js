@@ -194,11 +194,12 @@ async function validateRequestAuth(req, res) {
 
     if (xyzEnv.AUTH_PATH) {
       res.setHeader('location', `${xyzEnv.DIR}${xyzEnv.AUTH_PATH}/login`);
-      res.status(302).send();
-      return;
+    } else {
+      res.setHeader('location', `${xyzEnv.DIR}/api/user/login`);
     }
 
-    return login(req, res);
+    res.status(302).send();
+    return;
   }
 
   requestRouter(req, res);

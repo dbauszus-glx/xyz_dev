@@ -1,3 +1,10 @@
+/**
+## /user/logout
+
+Exports a default method which destroy the user cookie.
+
+@module /user/logout
+*/
 export default function logout(req, res) {
   res.setHeader(
     'Set-Cookie',
