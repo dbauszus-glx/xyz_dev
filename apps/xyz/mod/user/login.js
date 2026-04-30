@@ -28,7 +28,7 @@ Requests which require authentication will return the login method if the authen
 
 The loginBody method will be called if the request has a POST body.
 
-The loginView method will be returned with a message from a failed user validation or if no login post request body is provided.
+The view method will be called with login_view template with a message from a failed user validation or if no login post request body is provided.
 
 @param {req} req HTTP request.
 @param {res} res HTTP response.
@@ -55,7 +55,8 @@ export default function login(req, res) {
     return;
   }
 
-  return loginView(req, res);
+  req.params.template = 'login_view';
+  view(req, res);
 }
 
 /**
@@ -82,10 +83,11 @@ async function loginBody(req, res) {
   const user = await fromACL(req);
 
   if (user instanceof Error) {
-    // Return to loginView with a redirect from the loginView form.
     if (req.cookies?.[`${xyzEnv.TITLE}_redirect`]) {
       req.params.msg = user.message;
-      return loginView(req, res);
+      req.params.template = 'login_view';
+      view(req, res);
+      return;
     }
 
     return res
@@ -118,24 +120,4 @@ async function loginBody(req, res) {
   res.setHeader('Set-Cookie', user_cookie);
   res.setHeader('location', `${xyzEnv.DIR}/`);
   res.status(302).send();
-}
-
-/**
-@function loginView
-
-@description
-Any existing user cookie for the XYZ instance will be removed [set to null].
-
-A redirect cookie will be set to the response header for a redirect to the location after sucessful login.
-
-The default `login_view` will be set as template request parameter before the XYZ View API method will be returned.
-
-@param {req} req HTTP request.
-@param {res} res HTTP response.
-@property {Object} req.params HTTP request parameter.
-*/
-function loginView(req, res) {
-  req.params.template = 'login_view';
-
-  view(req, res);
 }
