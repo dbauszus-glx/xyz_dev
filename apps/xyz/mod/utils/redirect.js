@@ -55,7 +55,7 @@ export function setRedirect(req, res, cookies = []) {
   );
 
   cookies.push(
-    `${xyzEnv.TITLE}_redirect=${encodedRedirectUrl};HttpOnly;Max-Age=60000;Path=${xyzEnv.DIR || '/'}`,
+    `${xyzEnv.TITLE}_redirect=${encodedRedirectUrl};HttpOnly;Max-Age=60;Path=${xyzEnv.DIR || '/'}`,
   );
 
   // Set cookie with properly encoded redirect value.
