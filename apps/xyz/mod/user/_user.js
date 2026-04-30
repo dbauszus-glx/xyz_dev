@@ -31,6 +31,7 @@ import key from './key.js';
 import list from './list.js';
 import log from './log.js';
 import login from './login.js';
+import logout from './logout.js';
 import register from './register.js';
 import token from './token.js';
 import update from './update.js';
@@ -45,6 +46,7 @@ const methods = {
   list,
   log,
   login,
+  logout,
   register,
   token,
   update,

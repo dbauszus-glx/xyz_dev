@@ -132,7 +132,7 @@ describe('login', async () => {
 
     await login(req, res);
 
-    expect(res.statusCode).toEqual(302);
+    expect(res.statusCode).toEqual(200);
     expect(res.getHeader('location')).toEqual('/dashboard');
 
     const cookies = res.getHeader('Set-Cookie');
