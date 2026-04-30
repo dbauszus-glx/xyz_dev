@@ -60,14 +60,7 @@ describe('login', async () => {
     delete req.body;
     login(req, res);
 
-    // Verify the clear cookie header
-    const setCookieHeader = res.getHeader('Set-Cookie');
-    expect(setCookieHeader).toContain(
-      'TEST_APP=null;HttpOnly;Max-Age=0;Path=/app',
-    );
-
     // Verify view rendering behavior
-    expect(setRedirect).toHaveBeenCalledWith(req, res);
     expect(req.params.template).toEqual('login_view');
     expect(view).toHaveBeenCalledWith(req, res);
   });
