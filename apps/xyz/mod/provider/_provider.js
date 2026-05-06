@@ -73,5 +73,6 @@ export default async function provider(req, res) {
 
   res.setHeader('content-type', contentType);
 
-  res.send(response);
+  // Provider endpoints intentionally return static resource bytes with a fixed MIME type and nosniff.
+  res.send(response); // NOSONAR
 }
