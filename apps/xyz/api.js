@@ -3,14 +3,6 @@
 
 The XYZ API module exports the api function which serves as the entry point for all XYZ API requests.
 
-A node.js express app will require the api module and reference the exported api method for all request routes.
-
-```js
-const app = express()
-const api = require('./api/api')
-app.get(`/`, api)
-```
-
 @requires /utils/processEnv
 @requires /query
 @requires /view
@@ -49,7 +41,6 @@ import user from './mod/user/_user.js';
 import auth from './mod/user/auth.js';
 import login from './mod/user/login.js';
 import register from './mod/user/register.js';
-import { setRedirect } from './mod/utils/redirect.js';
 import view from './mod/view.js';
 import workspace from './mod/workspace/_workspace.js';
 
@@ -85,6 +76,9 @@ All other requests will passed to the async validateRequestAuth method.
 @property {Boolean} params.register The request should redirect to user/register.
 */
 export default function api(req, res) {
+  if (req.url === `${xyzEnv.DIR}/favicon.ico`) {
+    return;
+  }
   req.params = validateRequestParams(req);
 
   if (req.params instanceof Error) {
@@ -131,7 +125,7 @@ Requests without authorization headers will be redirected to the login if the us
 
 The user object will be assigned as to the req.params.
 
-PRIVATE processes require user auth for all requests and will shortcircuit to the user/login if the user authentication failed to resolve a user object.
+PRIVATE processes require user auth for all requests. The redirect logic will set the location header to the login page which is either defined by xyzEnv.AUTH_PATH or defaults to /api/user/login.
 
 @param {req} req HTTP request.
 @param {res} res HTTP response.
@@ -187,19 +181,67 @@ async function validateRequestAuth(req, res) {
 
   // PRIVATE instances require user auth for all requests.
   if (!req.params.user && xyzEnv.PRIVATE) {
-    // Redirect to the SAML login.
-    if (xyzEnv.SAML_LOGIN) {
-      // The redirect for a successful login.
-      setRedirect(req, res);
+    loginRedirect(req, res);
 
-      res.setHeader('location', `${xyzEnv.DIR}/saml/login`);
-      return res.status(302).send();
+    if (xyzEnv.AUTH_PATH) {
+      res.setHeader('location', `${xyzEnv.DIR}${xyzEnv.AUTH_PATH}/login`);
+    } else {
+      res.setHeader('location', `${xyzEnv.DIR}/api/user/login`);
     }
 
-    return login(req, res);
+    res.status(302).send();
+    return;
   }
 
   requestRouter(req, res);
+}
+
+/**
+@function loginRedirect
+
+@description
+The method will shortcircuit with an existing redirect `_redirect` cookie.
+
+Otherwise the request url will decoded and assigned to a redirect cookie with a short TTL of 60 seconds.
+
+Any existing user cookie will be removed to prevent unauthorized access with an existing cookie.
+
+The redirect cookie is used to redirect the user back to the original requested url after a successful login.
+
+@param {req} req HTTP request.
+@param {res} res HTTP response.
+*/
+function loginRedirect(req, res) {
+  if (req.url === `${xyzEnv.DIR}/`) {
+    return;
+  }
+
+  const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
+
+  if (redirect) {
+    return;
+  }
+
+  let redirectUrl =
+    req.url && decodeURIComponent(req.url).replace(/login=true/, '');
+
+  // Remove any characters that could be used for cookie injection
+  redirectUrl = redirectUrl.replaceAll(/[;\r\n]/g, '');
+
+  // Ensure it's a relative URL (it starts with '/')
+  if (!redirectUrl.startsWith('/')) {
+    redirectUrl = xyzEnv.DIR || '/';
+  }
+
+  // Encode the URL for safe storage in the cookie
+  const encodedRedirectUrl = encodeURIComponent(redirectUrl);
+
+  const user_cookie = `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`;
+
+  const redirect_cookie = `${xyzEnv.TITLE}_redirect=${encodedRedirectUrl};HttpOnly;Max-Age=60;Path=${xyzEnv.DIR || '/'}`;
+
+  // Set cookie with properly encoded redirect value.
+  res.setHeader('Set-Cookie', [user_cookie, redirect_cookie]);
 }
 
 /**
