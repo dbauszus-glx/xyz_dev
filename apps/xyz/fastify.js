@@ -77,21 +77,21 @@ if (process.versions.node.split('.')[0] < 22) {
 
 // app.use(cookieParser());
 
-import Fastify from 'fastify'
+import Fastify from 'fastify';
 
 const fastify = Fastify({
-  logger: true
-})
+  logger: true,
+});
 
 import fastifyStatic from '@fastify/static';
 
 fastify.register(fastifyStatic, {
-    root: publicDir,
-    prefix: '/public/',
+  root: publicDir,
+  prefix: '/public/',
 });
 
 // Declare a route
-fastify.get('/', api)
+fastify.get('/', api);
 
 fastify.get('/api/user/:method/:key?', api);
 
@@ -100,11 +100,11 @@ fastify.get('/api/workspace/:key', api);
 // Run the server!
 fastify.listen({ port: 3000 }, function (err, address) {
   if (err) {
-    fastify.log.error(err)
-    process.exit(1)
+    fastify.log.error(err);
+    process.exit(1);
   }
   // Server is now listening on ${address}
-})
+});
 
 // app.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
 
