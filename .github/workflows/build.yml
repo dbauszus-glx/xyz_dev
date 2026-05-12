@@ -26,13 +26,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Skip SonarQube for fork pull requests
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-        run: |
-          echo "Skipping SonarQube scan because this pull request comes from a fork."
-          echo "GitHub does not expose repository secrets, including SONAR_TOKEN, to fork pull_request workflows."
       - name: Check SonarQube token
-        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && env.SONAR_TOKEN == ''
+        if: env.SONAR_TOKEN == ''
         run: |
           echo "SONAR_TOKEN is not available to this workflow run."
           echo "Add a repository or organization secret named SONAR_TOKEN, or check whether this run is from a fork or Dependabot PR where secrets are restricted."
