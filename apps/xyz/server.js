@@ -61,9 +61,7 @@ if (process.versions.node.split('.')[0] < 22) {
   console.warn(`Process Node version below 22.`);
 }
 
-const app = express();
-
-app.disable('x-powered-by');
+const router = express.Router()
 
 const limiter = rateLimit({
   legacyHeaders: false,
@@ -73,10 +71,10 @@ const limiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
-app.use(limiter);
+router.use(limiter);
 
 // redirect if dir is missing in url path.
-app.use((req, res, next) => {
+router.use((req, res, next) => {
   if (xyzEnv.DIR && req.url.length === 1) {
     res.setHeader('location', `${xyzEnv.DIR}`);
     return res.status(302).send();
@@ -84,10 +82,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cookieParser());
+router.use(cookieParser());
 
 // redirect if dir is missing in url path.
-app.use((req, res, next) => {
+router.use((req, res, next) => {
   if (xyzEnv.DIR && req.url.length === 1) {
     res.setHeader('location', `${xyzEnv.DIR}`);
     return res.status(302).send();
@@ -95,46 +93,50 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
-app.use(xyzEnv.DIR, express.static(publicDir));
+router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
+router.use(xyzEnv.DIR, express.static(publicDir));
 
-app.use(validateRequestParams);
-app.use(validateRequestAuth);
+router.use(validateRequestParams);
+router.use(validateRequestAuth);
 
-app.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
+router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
 
-app.post(
+router.post(
   `${xyzEnv.DIR}/api/provider{/:provider}`,
   express.json({ limit: '5mb' }),
   provider,
 );
 
-app.get(`${xyzEnv.DIR || ''}/api/sign{/:signer}`, sign);
+router.get(`${xyzEnv.DIR || ''}/api/sign{/:signer}`, sign);
 
-app.get(`${xyzEnv.DIR}/api/query{/:template}`, query);
+router.get(`${xyzEnv.DIR}/api/query{/:template}`, query);
 
-app.post(
+router.post(
   `${xyzEnv.DIR}/api/query{/:template}`,
   express.json({ limit: '5mb' }),
   query,
 );
 
-app.get(`${xyzEnv.DIR}/api/workspace{/:key}`, workspace);
+router.get(`${xyzEnv.DIR}/api/workspace{/:key}`, workspace);
 
-app.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
+router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
 
-app.post(
+router.post(
   `${xyzEnv.DIR}/api/user{/:method}`,
   [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
   user,
 );
 
-app.get(`${xyzEnv.DIR}/view{/:template}`, view);
+router.get(`${xyzEnv.DIR}/view{/:template}`, view);
 
-app.get(`/`, view);
+router.get(`/`, view);
+
+const app = express();
+app.disable('x-powered-by');
+app.use(router);
 
 if (!process.env.VERCEL) {
   app.listen(xyzEnv.PORT);
 }
 
-export default app;
+export default router;
