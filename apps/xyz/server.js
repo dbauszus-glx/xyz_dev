@@ -38,7 +38,6 @@ RATE_LIMIT_WINDOW - Time window in ms (default: 1 min)
 @requires cookie-parser HTTP cookie parsing middleware
 @requires express-rate-limit Rate limiting middleware
 @requires /utils/processEnv
-@requires /utils/validateRequestParams
 */
 
 import { resolve } from 'node:path';
@@ -46,8 +45,15 @@ import './mod/utils/processEnv.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import api from './api.js';
-import validateRequestParams from './mod/utils/validateRequestParams.js';
+import validateRequestParams from './mod/middleware/validateRequestParams.js';
+import validateRequestAuth from './mod/middleware/validateRequestAuth.js';
+
+import provider from './mod/provider/_provider.js';
+import query from './mod/query.js';
+import sign from './mod/sign/_sign.js';
+import user from './mod/user/_user.js';
+import view from './mod/view.js';
+import workspace from './mod/workspace/_workspace.js';
 
 const publicDir = resolve(xyzEnv.XYZ_CWD || process.cwd(), 'public');
 
@@ -89,11 +95,11 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(validateRequestParams);
-
 app.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
-
 app.use(xyzEnv.DIR, express.static(publicDir));
+
+app.use(validateRequestParams);
+app.use(validateRequestAuth);
 
 app.get(`${xyzEnv.DIR}/api/provider{/:provider}`, api);
 
@@ -134,3 +140,36 @@ if (!process.env.VERCEL) {
 }
 
 export default app;
+
+function api(req, res) {
+  // Assign _params object from validateRequestParams module to req.params.
+  Object.assign(req.params, req._params);
+
+  console.log(req.url)
+
+  switch (true) {
+
+    case /(?<=\/api\/user)/.test(req.url):
+      user(req, res);
+      break;
+
+    case /(?<=\/api\/provider)/.test(req.url):
+      provider(req, res);
+      break;
+
+    case /(?<=\/api\/sign)/.test(req.url):
+      sign(req, res);
+      break;
+
+    case /(?<=\/api\/query)/.test(req.url):
+      query(req, res);
+      break;
+
+    case /(?<=\/api\/workspace)/.test(req.url):
+      workspace(req, res);
+      break;
+
+    default:
+      view(req, res);
+  }
+}

@@ -1,7 +1,7 @@
 /**
-## /utils/validateRequestParams
+## /middleware/validateRequestParams
 
-@module /utils/validateRequestParams
+@module /middleware/validateRequestParams
 */
 
 /**
