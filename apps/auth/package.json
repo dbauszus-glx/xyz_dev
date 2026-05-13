@@ -1,19 +1,17 @@
 {
-  "name": "@geolytix/xyz-saml-app",
+  "name": "@geolytix/xyz-auth-app",
   "version": "v1.0.0",
-  "description": "Optional SAML backend app",
+  "description": "Optional custom auth backend app",
   "type": "module",
   "scripts": {
     "dev": "node --inspect server.js"
   },
   "exports": {
-    ".": "./saml.js",
+    ".": "./auth.js",
     "./server": "./server.js"
   },
   "dependencies": {
-    "@node-saml/node-saml": "^5.0.1",
     "@geolytix/xyz-app": "file:../xyz",
-    "express": "5.2.0",
-    "jsonwebtoken": "^9.0.2"
+    "express": "5.2.0"
   }
 }

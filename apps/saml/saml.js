@@ -1,7 +1,4 @@
 /**
-@module saml-app
-@description
-
 Extracted SAML backend app for XYZ.
 
 This file used to live inside `apps/xyz/mod/user/saml.js`. It was moved into
@@ -18,20 +15,19 @@ The handler serves the complete SAML flow:
 
 Certificate files are still resolved relative to the `apps/xyz` package root so
 existing deployment layout and environment variables continue to work.
-*/
 
+@module saml-app
+*/
 import '../xyz/mod/utils/processEnv.js';
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import redirect from '@geolytix/xyz-app/mod/user/redirect.js';
+import { SAML } from '@node-saml/node-saml';
 import jwt from 'jsonwebtoken';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import acl from '../xyz/mod/user/acl.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-let samlStrat;
-let samlConfig;
 
 function parseBoolean(value, fallback) {
   if (value === undefined) return fallback;
@@ -41,72 +37,53 @@ function parseBoolean(value, fallback) {
   return fallback;
 }
 
-/**
-@function getModule
-Initializes the optional SAML dependency and returns the active request handler.
-If the dependency or required configuration is unavailable, the exported handler
-responds with `405 SAML not configured`.
-*/
-const getModule = async () => {
-  try {
-    const { SAML } = await import('@node-saml/node-saml');
-
-    samlConfig = {
-      acceptedClockSkewMs: xyzEnv.SAML_ACCEPTED_CLOCK_SKEW ?? -1,
-      callbackUrl: xyzEnv.SAML_ACS,
-      entryPoint: xyzEnv.SAML_SSO,
-      identifierFormat: xyzEnv.SAML_IDENTIFIER_FORMAT,
-      idpCert:
-        xyzEnv.SAML_IDP_CRT &&
-        String(readFileSync(join(__dirname, `./${xyzEnv.SAML_IDP_CRT}.crt`))),
-      issuer: xyzEnv.SAML_ENTITY_ID,
-      logoutCallbackUrl: xyzEnv.SLO_CALLBACK,
-      logoutUrl: xyzEnv.SAML_SLO,
-      privateKey:
-        xyzEnv.SAML_SP_CRT &&
-        String(readFileSync(join(__dirname, `./${xyzEnv.SAML_SP_CRT}.pem`))),
-      providerName: xyzEnv.SAML_PROVIDER_NAME,
-      publicCert:
-        xyzEnv.SAML_SP_CRT &&
-        String(readFileSync(join(__dirname, `./${xyzEnv.SAML_SP_CRT}.crt`))),
-      signatureAlgorithm: xyzEnv.SAML_SIGNATURE_ALGORITHM,
-      wantAssertionsSigned: parseBoolean(xyzEnv.SAML_WANT_ASSERTIONS_SIGNED),
-      wantAuthnResponseSigned: parseBoolean(
-        xyzEnv.SAML_AUTHN_RESPONSE_SIGNED,
-        false,
-      ),
-      disableRequestedAuthnContext:
-        xyzEnv.SAML_DISABLE_REQUESTED_AUTHN_CONTEXT !== undefined
-          ? xyzEnv.SAML_DISABLE_REQUESTED_AUTHN_CONTEXT === 'true'
-          : true,
-    };
-
-    samlStrat = new SAML(samlConfig);
-
-    return saml;
-  } catch {
-    const samlKeys = Object.keys(xyzEnv).filter((key) =>
-      key.startsWith('SAML'),
-    );
-
-    if (samlKeys.length > 0) {
-      console.log('SAML2 module is not available.');
-    }
-
-    return samlNotConfigured;
-  }
+const samlConfig = {
+  acceptedClockSkewMs: xyzEnv.SAML_ACCEPTED_CLOCK_SKEW ?? -1,
+  callbackUrl: xyzEnv.SAML_ACS,
+  entryPoint: xyzEnv.SAML_SSO,
+  identifierFormat: xyzEnv.SAML_IDENTIFIER_FORMAT,
+  idpCert:
+    xyzEnv.SAML_IDP_CRT &&
+    String(readFileSync(join(__dirname, `./${xyzEnv.SAML_IDP_CRT}.crt`))),
+  issuer: xyzEnv.SAML_ENTITY_ID,
+  logoutCallbackUrl: xyzEnv.SLO_CALLBACK,
+  logoutUrl: xyzEnv.SAML_SLO,
+  privateKey:
+    xyzEnv.SAML_SP_CRT &&
+    String(readFileSync(join(__dirname, `./${xyzEnv.SAML_SP_CRT}.pem`))),
+  providerName: xyzEnv.SAML_PROVIDER_NAME,
+  publicCert:
+    xyzEnv.SAML_SP_CRT &&
+    String(readFileSync(join(__dirname, `./${xyzEnv.SAML_SP_CRT}.crt`))),
+  signatureAlgorithm: xyzEnv.SAML_SIGNATURE_ALGORITHM,
+  wantAssertionsSigned: parseBoolean(xyzEnv.SAML_WANT_ASSERTIONS_SIGNED),
+  wantAuthnResponseSigned: parseBoolean(
+    xyzEnv.SAML_AUTHN_RESPONSE_SIGNED,
+    false,
+  ),
+  disableRequestedAuthnContext:
+    xyzEnv.SAML_DISABLE_REQUESTED_AUTHN_CONTEXT === undefined
+      ? true
+      : xyzEnv.SAML_DISABLE_REQUESTED_AUTHN_CONTEXT === 'true',
 };
 
-function samlNotConfigured(req, res) {
-  res.status(405).send('SAML not configured');
+let samlStrat;
+
+export default function saml(req, res) {
+  return samlHandler(req, res, getSamlStrat(), redirect);
 }
 
-const exportedModule = await getModule();
+export function createSamlHandler(strategy, redirectUser = redirect) {
+  return (req, res) => samlHandler(req, res, strategy, redirectUser);
+}
 
-export default exportedModule;
+function getSamlStrat() {
+  samlStrat ??= new SAML(samlConfig);
+  return samlStrat;
+}
 
-function saml(req, res) {
-  if (!samlStrat) {
+function samlHandler(req, res, strategy, redirectUser) {
+  if (!strategy) {
     console.warn('SAML is not available in XYZ instance.');
     return;
   }
@@ -114,30 +91,25 @@ function saml(req, res) {
   // Dispatch the mounted SAML endpoints from a single handler.
   switch (true) {
     case /\/saml\/metadata/.test(req.url):
-      metadata(res);
-      break;
+      return metadata(res, strategy);
 
     case /\/saml\/logout\/callback/.test(req.url):
-      logoutCallback(res);
-      break;
+      return logoutCallback(res);
 
     case /\/saml\/logout/.test(req.url):
-      logout(req, res);
-      break;
+      return logout(req, res, strategy);
 
     case req.params?.login || /\/saml\/login/.test(req.url):
-      login(req, res);
-      break;
+      return login(req, res, strategy);
 
     case /\/saml\/acs/.test(req.url):
-      acs(req, res);
-      break;
+      return acs(req, res, strategy, redirectUser);
   }
 }
 
-function metadata(res) {
+function metadata(res, strategy) {
   res.setHeader('Content-Type', 'application/xml');
-  const metadata = samlStrat.generateServiceProviderMetadata(
+  const metadata = strategy.generateServiceProviderMetadata(
     null,
     samlConfig.idpCert,
   );
@@ -161,9 +133,9 @@ function logoutCallback(res) {
   }
 }
 
-async function logout(req, res) {
+async function logout(req, res, strategy) {
   try {
-    const user = await jwt.decode(req.cookies[`${xyzEnv.TITLE}`]);
+    const user = await jwt.decode(req.cookies?.[`${xyzEnv.TITLE}`]);
 
     if (!user) {
       res.setHeader('location', `${xyzEnv.DIR || '/'}`);
@@ -171,7 +143,7 @@ async function logout(req, res) {
     }
 
     if (user.sessionIndex) {
-      const url = await samlStrat.getLogoutUrlAsync(user);
+      const url = await strategy.getLogoutUrlAsync(user);
 
       res.setHeader('location', url);
       return res.status(302).send();
@@ -186,12 +158,13 @@ async function logout(req, res) {
   }
 }
 
-async function login(req, res) {
+async function login(req, res, strategy) {
   const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
 
   try {
+    //This tells the IDP where to redirect to
     const relayState = (redirect || xyzEnv.DIR) ?? '/';
-    const url = await samlStrat.getAuthorizeUrlAsync(
+    const url = await strategy.getAuthorizeUrlAsync(
       relayState,
       req.headers['x-forwarded-host'],
       { additionalParams: {} },
@@ -205,12 +178,13 @@ async function login(req, res) {
   }
 }
 
-async function acs(req, res) {
+async function acs(req, res, strategy, redirectUser) {
   try {
-    const samlResponse = await samlStrat.validatePostResponseAsync(req.body);
+    const samlResponse = await strategy.validatePostResponseAsync(req.body);
 
     const user = {
       email: samlResponse.profile.email || samlResponse.profile.nameID,
+      lookup: true,
       nameID: samlResponse.profile.nameID,
       nameIDFormat: samlResponse.profile.nameIDFormat,
       nameQualifier: samlResponse.profile.nameQualifier,
@@ -218,84 +192,8 @@ async function acs(req, res) {
       spNameQualifier: samlResponse.profile.spNameQualifier,
     };
 
-    // Optionally enrich the SAML profile with ACL roles from the XYZ app.
-    if (xyzEnv.SAML_ACL) {
-      const aclResponse = await aclLookUp(user.email);
-
-      if (aclResponse instanceof Error && xyzEnv.SAML_SLO) {
-        const url = await samlStrat.getLogoutUrlAsync(user);
-
-        res.setHeader('location', url);
-        return res.status(302).send();
-      }
-
-      if (aclResponse instanceof Error) {
-        res.status(401).send(aclResponse.message);
-        return;
-      }
-
-      Object.assign(user, aclResponse);
-    }
-
-    const token = jwt.sign(user, xyzEnv.SECRET, {
-      expiresIn: xyzEnv.COOKIE_TTL,
-      algorithm: xyzEnv.SECRET_ALGORITHM,
-    });
-
-    const cookie =
-      `${xyzEnv.TITLE}=${token};HttpOnly;` +
-      `Max-Age=${xyzEnv.COOKIE_TTL};` +
-      `Path=${xyzEnv.DIR || '/'};`;
-
-    res.setHeader('Set-Cookie', cookie);
-
-    const redirect = req.body.RelayState;
-    let location = xyzEnv.DIR || '/';
-
-    if (redirect) {
-      const decodedRedirect = decodeURIComponent(redirect);
-      const sanitized = decodedRedirect.replaceAll(/[;\r\n]/g, '');
-
-      if (sanitized.startsWith('/')) {
-        location = sanitized;
-      }
-    }
-
-    res.setHeader('location', location);
-
-    return res.status(302).send();
+    return await redirectUser(req, res, user);
   } catch (error) {
     console.error(error);
   }
-}
-
-async function aclLookUp(email) {
-  if (acl === null) {
-    return new Error('ACL unavailable.');
-  }
-
-  const date = new Date();
-  const rows = await acl(
-    `
-    UPDATE acl_schema.acl_table
-    SET access_log = array_append(access_log, '${date.toISOString().replace(/\..*/, '')}')
-    WHERE lower(email) = lower($1)
-    RETURNING email, roles, language, blocked, approved, approved_by, verified, admin, password;`,
-    [email],
-  );
-
-  if (rows instanceof Error) return new Error('Failed to query to ACL.');
-
-  const user = rows[0];
-
-  if (!user) return new Error('User not found.');
-  if (user.blocked) return new Error('User blocked in ACL.');
-  if (!user.verified) return new Error('User not verified in ACL');
-  if (!user.approved) return new Error('User not approved in ACL');
-
-  return {
-    admin: user.admin,
-    language: user.language,
-    roles: user.roles,
-  };
 }

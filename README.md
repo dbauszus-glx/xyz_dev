@@ -54,6 +54,8 @@ Polymorphism is applied to extend or modify object types and methods through plu
 
 Dynamic module imports reduce the need to bundle 3rd party libraries such as [Tabulator](https://github.com/olifolkerd/tabulator) and [Chart.js](https://github.com/chartjs/Chart.js).
 
+**v5** is a restructure as a Turbo monorepo with individual apps.
+
 ## XYZ Dependencies
 
 **Node.js v22+** is required for importing ESM modules.

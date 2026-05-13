@@ -11,12 +11,8 @@ vi.mock('@geolytix/xyz-app/mod/view.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('@geolytix/xyz-app/mod/utils/redirect.js', () => ({
-  setRedirect: vi.fn(),
-}));
-
 // Set environment variables
-global.xyzEnv = {
+globalThis.xyzEnv = {
   DIR: '/app',
   TITLE: 'TEST_APP',
   SECRET: 'super_secret_key',
@@ -29,9 +25,6 @@ describe('login', async () => {
     '@geolytix/xyz-app/mod/user/login.js'
   );
   const view = (await import('@geolytix/xyz-app/mod/view.js')).default;
-  const { setRedirect } = await import(
-    '@geolytix/xyz-app/mod/utils/redirect.js'
-  );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,14 +53,7 @@ describe('login', async () => {
     delete req.body;
     login(req, res);
 
-    // Verify the clear cookie header
-    const setCookieHeader = res.getHeader('Set-Cookie');
-    expect(setCookieHeader).toContain(
-      'TEST_APP=null;HttpOnly;Max-Age=0;Path=/app',
-    );
-
     // Verify view rendering behavior
-    expect(setRedirect).toHaveBeenCalledWith(req, res);
     expect(req.params.template).toEqual('login_view');
     expect(view).toHaveBeenCalledWith(req, res);
   });
@@ -125,28 +111,11 @@ describe('login', async () => {
       body: { email: 'test@email.com', password: 'correct' },
       params: {},
       headers: { host: 'example.com' }, // Triggers the ';Secure' flag
-      cookies: {
-        TEST_APP_redirect: encodeURIComponent('/dashboard'),
-      },
     });
 
     await login(req, res);
 
     expect(res.statusCode).toEqual(302);
-    expect(res.getHeader('location')).toEqual('/dashboard');
-
-    const cookies = res.getHeader('Set-Cookie');
-    expect(cookies).toHaveLength(2);
-
-    // Assert user token cookie (includes Secure flag since host != localhost)
-    expect(cookies[0]).toContain('TEST_APP=');
-    expect(cookies[0]).toContain(
-      'HttpOnly;Max-Age=3600;Path=/app;SameSite=Strict;Secure',
-    );
-
-    // Assert redirect clearing cookie
-    expect(cookies[1]).toEqual(
-      'TEST_APP_redirect=null;HttpOnly;Max-Age=0;Path=/app',
-    );
+    expect(res.getHeader('location')).toEqual('/app/');
   });
 });

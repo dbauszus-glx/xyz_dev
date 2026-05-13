@@ -11,12 +11,9 @@ Exports the login method for the /api/user/login route.
 @module /user/login
 */
 
-import jsonwebtoken from 'jsonwebtoken';
-import { setRedirect } from '../utils/redirect.js';
 import view from '../view.js';
 import fromACL from './fromACL.js';
-
-const { sign } = jsonwebtoken;
+import redirect from './redirect.js';
 
 /**
 @function login
@@ -28,7 +25,7 @@ Requests which require authentication will return the login method if the authen
 
 The loginBody method will be called if the request has a POST body.
 
-The loginView method will be returned with a message from a failed user validation or if no login post request body is provided.
+The view method will be called with login_view template with a message from a failed user validation or if no login post request body is provided.
 
 @param {req} req HTTP request.
 @param {res} res HTTP response.
@@ -45,8 +42,7 @@ export default function login(req, res) {
 
   // The request has body with data from the login view submit.
   if (req.body) {
-    loginBody(req, res);
-    return;
+    return loginBody(req, res);
   }
 
   if (!req.params.msg && req.params.user) {
@@ -55,7 +51,8 @@ export default function login(req, res) {
     return;
   }
 
-  return loginView(req, res);
+  req.params.template = 'login_view';
+  view(req, res);
 }
 
 /**
@@ -69,9 +66,7 @@ The method checks for a redirect location on a `_redirect` cookie.
 
 The login view will be returned if the fromACL() errs.
 
-A user cookie will signed and set as response header.
-
-The response will be redirected to the location from the redirect cookie. The redirect cookie will be removed.
+The user will be passed with the request and response object to the user/direct module.
 
 @param {req} req HTTP request.
 @param {res} res HTTP response.
@@ -81,16 +76,12 @@ The response will be redirected to the location from the redirect cookie. The re
 async function loginBody(req, res) {
   const user = await fromACL(req);
 
-  const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
-
-  // Decode the redirect URL since it's now encoded when stored
-  const decodedRedirect = redirect ? decodeURIComponent(redirect) : null;
-
   if (user instanceof Error) {
-    // Return to loginView with a redirect from the loginView form.
-    if (decodedRedirect) {
+    if (req.cookies?.[`${xyzEnv.TITLE}_redirect`]) {
       req.params.msg = user.message;
-      return loginView(req, res);
+      req.params.template = 'login_view';
+      view(req, res);
+      return;
     }
 
     return res
@@ -99,54 +90,5 @@ async function loginBody(req, res) {
       .send(user.message);
   }
 
-  const token = sign(
-    {
-      admin: user.admin,
-      email: user.email,
-      language: user.language,
-      roles: user.roles,
-      session: user.session,
-    },
-    xyzEnv.SECRET,
-    {
-      expiresIn: xyzEnv.COOKIE_TTL,
-      algorithm: xyzEnv.SECRET_ALGORITHM,
-    },
-  );
-
-  const user_cookie = `${xyzEnv.TITLE}=${token};HttpOnly;Max-Age=${xyzEnv.COOKIE_TTL};Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`;
-
-  const redirect_null_cookie = `${xyzEnv.TITLE}_redirect=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`;
-
-  res.setHeader('Set-Cookie', [user_cookie, redirect_null_cookie]);
-  res.setHeader('location', `${decodedRedirect || xyzEnv.DIR}`);
-  res.status(302).send();
-}
-
-/**
-@function loginView
-
-@description
-Any existing user cookie for the XYZ instance will be removed [set to null].
-
-A redirect cookie will be set to the response header for a redirect to the location after sucessful login.
-
-The default `login_view` will be set as template request parameter before the XYZ View API method will be returned.
-
-@param {req} req HTTP request.
-@param {res} res HTTP response.
-@property {Object} req.params HTTP request parameter.
-*/
-function loginView(req, res) {
-  // Clear user token cookie.
-  res.setHeader(
-    'Set-Cookie',
-    `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
-  );
-
-  setRedirect(req, res);
-
-  req.params.template = 'login_view';
-
-  view(req, res);
+  redirect(req, res, user);
 }
