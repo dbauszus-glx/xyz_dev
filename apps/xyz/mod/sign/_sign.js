@@ -53,6 +53,8 @@ The response from the method is returned with the HTTP response.
 @returns {Promise} The promise resolves into the response from the signerModules method.
 */
 export default async function signer(req, res) {
+  Object.assign(req.params, req._params);
+  
   if (!Object.hasOwn(signerModules, req.params.signer)) {
     return res
       .status(404)

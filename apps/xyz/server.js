@@ -101,75 +101,40 @@ app.use(xyzEnv.DIR, express.static(publicDir));
 app.use(validateRequestParams);
 app.use(validateRequestAuth);
 
-app.get(`${xyzEnv.DIR}/api/provider{/:provider}`, api);
+app.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
 
 app.post(
   `${xyzEnv.DIR}/api/provider{/:provider}`,
   express.json({ limit: '5mb' }),
-  api,
+  provider,
 );
 
-app.get(`${xyzEnv.DIR || ''}/api/sign{/:signer}`, api);
+app.get(`${xyzEnv.DIR || ''}/api/sign{/:signer}`, sign);
 
-app.get(`${xyzEnv.DIR}/api/query{/:template}`, api);
+app.get(`${xyzEnv.DIR}/api/query{/:template}`, query);
 
 app.post(
   `${xyzEnv.DIR}/api/query{/:template}`,
   express.json({ limit: '5mb' }),
-  api,
+  query,
 );
 
-app.get(`${xyzEnv.DIR}/api/workspace{/:key}`, api);
+app.get(`${xyzEnv.DIR}/api/workspace{/:key}`, workspace);
 
-app.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, api);
+app.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
 
 app.post(
   `${xyzEnv.DIR}/api/user{/:method}`,
   [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
-  api,
+  user,
 );
 
-app.get(`${xyzEnv.DIR}/view{/:template}`, api);
+app.get(`${xyzEnv.DIR}/view{/:template}`, view);
 
-app.get(`${xyzEnv.DIR}{/:locale}`, api);
-
-app.get(`/`, api);
+app.get(`/`, view);
 
 if (!process.env.VERCEL) {
   app.listen(xyzEnv.PORT);
 }
 
 export default app;
-
-function api(req, res) {
-  // Assign _params object from validateRequestParams module to req.params.
-  Object.assign(req.params, req._params);
-
-  console.log(req.url)
-
-  switch (true) {
-
-    case /(?<=\/api\/user)/.test(req.url):
-      user(req, res);
-      break;
-
-    case /(?<=\/api\/provider)/.test(req.url):
-      provider(req, res);
-      break;
-
-    case /(?<=\/api\/sign)/.test(req.url):
-      sign(req, res);
-      break;
-
-    case /(?<=\/api\/query)/.test(req.url):
-      query(req, res);
-      break;
-
-    case /(?<=\/api\/workspace)/.test(req.url):
-      workspace(req, res);
-      break;
-
-    default:
-      view(req, res);
-  }
-}

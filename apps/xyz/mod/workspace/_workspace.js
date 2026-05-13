@@ -64,6 +64,8 @@ The method checks whether the req.params.key matches a keyMethods property and r
 @property {string} params.key Workspace API method requested.
 */
 export default async function getKeyMethod(req, res) {
+  Object.assign(req.params, req._params);
+  
   workspace = await workspaceCache();
 
   if (workspace instanceof Error) {
