@@ -48,6 +48,7 @@ export default async function validateRequestAuth(req, res, next) {
 
   // Short circuit to user/login.
   if (req.params.login || req.body?.login) {
+    //res.send();
     return login(req, res);
   }
 

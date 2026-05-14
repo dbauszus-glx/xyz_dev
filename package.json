@@ -28,9 +28,10 @@
   "license": "MIT",
   "dependencies": {
     "@geolytix/mapp": "file:apps/mapp",
-    "@geolytix/xyz-auth-app": "file:apps/auth",
     "@geolytix/xyz-app": "file:apps/xyz",
-    "@geolytix/xyz-saml-app": "file:apps/saml"
+    "@geolytix/xyz-auth-app": "file:apps/auth",
+    "@geolytix/xyz-saml-app": "file:apps/saml",
+    "express": "5.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.6",

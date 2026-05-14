@@ -45,11 +45,12 @@ import './mod/utils/processEnv.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import validateRequestAuth from './mod/middleware/validateRequestAuth.js';
-import validateRequestParams from './mod/middleware/validateRequestParams.js';
+import validateRequestAuth from '../xyz/mod/middleware/validateRequestAuth.js';
+import validateRequestParams from '../xyz/mod/middleware/validateRequestParams.js';
 
 import provider from './mod/provider/_provider.js';
 import query from './mod/query.js';
+import router from '../../routerFactory.js';
 import sign from './mod/sign/_sign.js';
 import user from './mod/user/_user.js';
 import view from './mod/view.js';
@@ -61,8 +62,6 @@ if (process.versions.node.split('.')[0] < 22) {
   console.warn(`Process Node version below 22.`);
 }
 
-const router = express.Router();
-
 const limiter = rateLimit({
   legacyHeaders: false,
   limit: xyzEnv.RATE_LIMIT,
@@ -71,7 +70,10 @@ const limiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
+const app = express();
 router.use(limiter);
+
+router.use(cookieParser());
 
 // redirect if dir is missing in url path.
 router.use((req, res, next) => {
@@ -86,7 +88,8 @@ router.use((req, res, next) => {
   next();
 });
 
-router.use(cookieParser());
+router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
+router.use(xyzEnv.DIR, express.static(publicDir));
 
 // redirect if dir is missing in url path.
 router.use((req, res, next) => {
@@ -96,12 +99,6 @@ router.use((req, res, next) => {
   }
   next();
 });
-
-router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
-router.use(xyzEnv.DIR, express.static(publicDir));
-
-router.use(validateRequestParams);
-router.use(validateRequestAuth);
 
 router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
 
@@ -133,14 +130,18 @@ router.post(
 
 router.get(`${xyzEnv.DIR}/view{/:template}`, view);
 
-router.get(`/`, view);
+router.get(`${xyzEnv.DIR}/`, view);
 
-const app = express();
-app.disable('x-powered-by');
 app.use(router);
+
+app.use(validateRequestParams);
+app.use(validateRequestAuth);
+
+app.disable('x-powered-by');
 
 if (!process.env.VERCEL) {
   app.listen(xyzEnv.PORT);
 }
 
-export default router;
+export const xyzRouter = router;
+export default app;
