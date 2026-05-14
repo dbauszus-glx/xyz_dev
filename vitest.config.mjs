@@ -9,6 +9,7 @@ export default defineConfig({
     fileParallelism: true,
     coverage: {
       provider: 'v8', // or 'istanbul'
+      reporter: ['text', 'lcov'],
     },
   },
 });

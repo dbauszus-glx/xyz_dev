@@ -25,3 +25,9 @@ The XYZ API modules are:
 ### [User](/xyz/module-_user)
 
 ### [Sign](/xyz/module-_sign)
+
+### [Provider](/xyz/module-_provider)
+
+Provider responses set `X-Content-Type-Options: nosniff` and only allow explicit `application/json` or `text/plain` response content types from request parameters.
+
+JavaScript plugin modules are served as `text/javascript` when the requested provider resource URL ends in `.js` or `.mjs`. This MIME type is derived from the resource URL so plugins can be dynamically imported from any provider without allowing arbitrary request parameters to make non-JavaScript responses executable.
