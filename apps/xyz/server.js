@@ -45,8 +45,8 @@ import './mod/utils/processEnv.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import validateRequestParams from './mod/middleware/validateRequestParams.js';
 import validateRequestAuth from './mod/middleware/validateRequestAuth.js';
+import validateRequestParams from './mod/middleware/validateRequestParams.js';
 
 import provider from './mod/provider/_provider.js';
 import query from './mod/query.js';
@@ -61,7 +61,7 @@ if (process.versions.node.split('.')[0] < 22) {
   console.warn(`Process Node version below 22.`);
 }
 
-const router = express.Router()
+const router = express.Router();
 
 const limiter = rateLimit({
   legacyHeaders: false,
@@ -75,7 +75,6 @@ router.use(limiter);
 
 // redirect if dir is missing in url path.
 router.use((req, res, next) => {
-
   if (/(?<=\/.well-known\/appspecific)/.test(req.url)) {
     return;
   }

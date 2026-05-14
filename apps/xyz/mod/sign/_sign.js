@@ -54,7 +54,7 @@ The response from the method is returned with the HTTP response.
 */
 export default async function signer(req, res) {
   Object.assign(req.params, req._params);
-  
+
   if (!Object.hasOwn(signerModules, req.params.signer)) {
     return res
       .status(404)

@@ -75,7 +75,7 @@ Requests to the user module are debounced by 5 seconds preventing registration, 
 */
 export default async function user(req, res) {
   Object.assign(req.params, req._params);
-  
+
   if (!Object.hasOwn(methods, req.params.method)) {
     return res.send(`Failed to evaluate 'method' param.`);
   }

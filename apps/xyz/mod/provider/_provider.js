@@ -43,7 +43,7 @@ The content type is derived from the requested resource if the URL ends with a J
 */
 export default async function provider(req, res) {
   Object.assign(req.params, req._params);
-  
+
   if (!Object.hasOwn(providerModules, req.params.provider)) {
     return res.status(404).send('Failed to validate provider param.');
   }

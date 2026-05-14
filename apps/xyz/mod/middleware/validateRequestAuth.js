@@ -30,7 +30,6 @@ PRIVATE processes require user auth for all requests. The redirect logic will se
 @property {string} req.url The request url.
 */
 export default async function validateRequestAuth(req, res, next) {
-
   // Assign _params object from validateRequestParams module to req.params.
   Object.assign(req.params, req._params);
 
@@ -108,7 +107,7 @@ export default async function validateRequestAuth(req, res, next) {
       // TODO investigate dev tool requests.
       console.log(req.url);
       return;
-    };
+    }
 
     if (xyzEnv.AUTH_PATH) {
       res.setHeader('location', `${xyzEnv.DIR}${xyzEnv.AUTH_PATH}/login`);
