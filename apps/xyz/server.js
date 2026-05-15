@@ -70,7 +70,6 @@ const limiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
-const app = express();
 router.use(limiter);
 
 router.use(cookieParser());
@@ -123,12 +122,11 @@ router.get(`${xyzEnv.DIR}/view{/:template}`, view);
 
 router.get(`${xyzEnv.DIR}/`, view);
 
+const app = express();
+app.disable('x-powered-by');
 app.use(router);
-
 app.use(validateRequestParams);
 app.use(validateRequestAuth);
-
-app.disable('x-powered-by');
 
 if (!process.env.VERCEL) {
   app.listen(xyzEnv.PORT);
