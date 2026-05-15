@@ -60,10 +60,8 @@ export default async function validateRequestAuth(req, res, next) {
   // Validate signature of either request token, authorization header, or cookie.
   const user = await auth(req, res);
 
-  //Key authentication generates a response
-  if (user instanceof ServerResponse) {
-    return user;
-  }
+  // The auth module has sent a response.
+  if (res.finished) return;
 
   //Call request router if signature authentication was used.
   if (user?.signature_auth) return requestRouter(req, res);

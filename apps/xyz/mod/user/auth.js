@@ -51,7 +51,8 @@ export default async function auth(req, res) {
   if (acl === null) return null;
 
   if (req.headers.authorization) {
-    return await fromACL(req);
+    const user = await fromACL(req);
+    return user;
   }
 
   //Verify signed urls
@@ -60,6 +61,7 @@ export default async function auth(req, res) {
   if (signatureCheck || signatureCheck instanceof Error) {
     return signatureCheck;
   }
+
   // Get token from params or cookie.
   const token = req.params.token || req.cookies?.[xyzEnv.TITLE];
 
@@ -137,17 +139,19 @@ function keyVerification(req, res) {
   req.params.expires ??= 0;
 
   if (Number.parseInt(req.params.expires) < Date.parse(new Date())) {
-    return res
+    res
       .status(401)
       .setHeader('Content-Type', 'text/plain')
       .send('Signature authentication failed');
+    return;
   }
 
   if (!Object.hasOwn(xyzEnv.WALLET, req.params.key_id)) {
-    return res
+    res
       .status(405)
       .setHeader('Content-Type', 'text/plain')
       .send('Signature authentication not configured');
+    return;
   }
 
   try {
@@ -162,10 +166,11 @@ function keyVerification(req, res) {
       .digest('hex');
 
     if (signature !== req.params.signature) {
-      return res
+      res
         .status(401)
         .setHeader('Content-Type', 'text/plain')
         .send('Signature authentication failed');
+      return;
     }
 
     //Delete params that are no longer required.
@@ -178,7 +183,7 @@ function keyVerification(req, res) {
 
     return { signature_auth: true };
   } catch (error) {
-    console.err(error);
+    console.error(error);
   }
 }
 
