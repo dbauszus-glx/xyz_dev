@@ -16,8 +16,8 @@ await import('@geolytix/xyz-app/mod/utils/processEnv.js');
 import createRouter from '@geolytix/xyz-app/router';
 
 import rootRedirect from '../xyz/mod/middleware/rootRedirect.js';
-import validateRequestParams from '../xyz/mod/middleware/validateRequestParams.js';
 import validateRequestAuth from '../xyz/mod/middleware/validateRequestAuth.js';
+import validateRequestParams from '../xyz/mod/middleware/validateRequestParams.js';
 
 const { custom_login, custom_logout, custom_verify } = await import(
   './customAuth.js'
