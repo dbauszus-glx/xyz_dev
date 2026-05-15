@@ -40,93 +40,17 @@ RATE_LIMIT_WINDOW - Time window in ms (default: 1 min)
 @requires /utils/processEnv
 */
 
-import { resolve } from 'node:path';
 import './mod/utils/processEnv.js';
-import cookieParser from 'cookie-parser';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import createRouter from '../../routerFactory.js';
 import validateRequestAuth from '../xyz/mod/middleware/validateRequestAuth.js';
 import validateRequestParams from '../xyz/mod/middleware/validateRequestParams.js';
 
-import provider from './mod/provider/_provider.js';
-import query from './mod/query.js';
-import router from '../../routerFactory.js';
-import sign from './mod/sign/_sign.js';
-import user from './mod/user/_user.js';
-import view from './mod/view.js';
-import workspace from './mod/workspace/_workspace.js';
-
-const publicDir = resolve(xyzEnv.XYZ_CWD || process.cwd(), 'public');
-
-if (process.versions.node.split('.')[0] < 22) {
-  console.warn(`Process Node version below 22.`);
-}
-
-const limiter = rateLimit({
-  legacyHeaders: false,
-  limit: xyzEnv.RATE_LIMIT,
-  standardHeaders: 'draft-8',
-  windowMs: xyzEnv.RATE_LIMIT_WINDOW,
-  validate: { xForwardedForHeader: false },
-});
-
-router.use(limiter);
-
-router.use(cookieParser());
-
-// redirect if dir is missing in url path.
-router.use((req, res, next) => {
-  if (/(?<=\/.well-known\/appspecific)/.test(req.url)) {
-    return;
-  }
-
-  if (xyzEnv.DIR && req.url.length === 1) {
-    res.setHeader('location', `${xyzEnv.DIR}`);
-    return res.status(302).send();
-  }
-  next();
-});
-
-router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
-router.use(xyzEnv.DIR, express.static(publicDir));
-
-router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
-
-router.post(
-  `${xyzEnv.DIR}/api/provider{/:provider}`,
-  express.json({ limit: '5mb' }),
-  provider,
-);
-
-router.get(`${xyzEnv.DIR}/api/sign{/:signer}`, sign);
-
-router.get(`${xyzEnv.DIR}/api/query{/:template}`, query);
-
-router.post(
-  `${xyzEnv.DIR}/api/query{/:template}`,
-  express.json({ limit: '5mb' }),
-  query,
-);
-
-router.get(`${xyzEnv.DIR}/api/workspace{/:key}`, workspace);
-
-router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
-
-router.post(
-  `${xyzEnv.DIR}/api/user{/:method}`,
-  [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
-  user,
-);
-
-router.get(`${xyzEnv.DIR}/view{/:template}`, view);
-
-router.get(`${xyzEnv.DIR}/`, view);
-
+const router = createRouter([validateRequestParams, validateRequestAuth]);
 const app = express();
-app.disable('x-powered-by');
 app.use(router);
-app.use(validateRequestParams);
-app.use(validateRequestAuth);
+
+app.disable('x-powered-by');
 
 if (!process.env.VERCEL) {
   app.listen(xyzEnv.PORT);
