@@ -59,13 +59,6 @@ export default async function auth(req, res) {
     return user;
   }
 
-  //Verify signed urls
-  const signatureCheck = keyVerification(req, res);
-
-  if (signatureCheck || signatureCheck instanceof Error) {
-    return signatureCheck;
-  }
-
   // Get token from params or cookie.
   const token = req.params.token || req.cookies?.[xyzEnv.TITLE];
 
@@ -134,7 +127,7 @@ We compare the given signature to one calcualted from the key and the url.
 
 @returns {Object} returns an object containing whether or not the signature verification passed.
 */
-function keyVerification(req, res) {
+function signatureVerification(req, res) {
   if (!req.params.signature) return null;
 
   //Only use signature verification on provider endpoints.
@@ -184,8 +177,6 @@ function keyVerification(req, res) {
 
     //Keep track that this is a signed request.
     req.params.signed = true;
-
-    return { signature_auth: true };
   } catch (error) {
     console.error(error);
   }

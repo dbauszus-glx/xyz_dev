@@ -41,9 +41,6 @@ export default async function validateRequestAuth(req, res, next) {
   // The auth module has sent a response.
   if (res.finished) return;
 
-  //Call request router if signature authentication was used.
-  if (user?.signature_auth) return requestRouter(req, res);
-
   // Remove token from params object.
   delete req.params.token;
 
