@@ -82,8 +82,8 @@ export default async function validateRequestAuth(req, res, next) {
   if (!req.params.user && xyzEnv.PRIVATE) {
     if (loginRedirect(req, res)) {
       // TODO investigate dev tool requests.
-      console.log(req.url);
-      return;
+      // console.log(req.url);
+      // return;
     }
 
     if (xyzEnv.AUTH_PATH) {

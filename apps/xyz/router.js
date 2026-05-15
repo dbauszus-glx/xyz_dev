@@ -28,7 +28,6 @@ import workspace from './mod/workspace/_workspace.js';
 @description
 Creates an express router with xyz base endpoints.
 
-
 @param {Array<Function>} [middleWare] an optinal array of middleware functions to be run.
 
 @returns {Object} Returns an express router.
@@ -57,43 +56,54 @@ function createRouter(middleWare = []) {
   router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
   router.use(xyzEnv.DIR, express.static(publicDir));
 
-  if (middleWare.length) {
-    router.use(middleWare);
-  }
+  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`,
+    middleWare,
+    user);
 
-  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
-
-  router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
+  router.get(`${xyzEnv.DIR}/api/provider{/:provider}`,
+    middleWare,
+    provider);
 
   router.post(
     `${xyzEnv.DIR}/api/provider{/:provider}`,
     express.json({ limit: '5mb' }),
-    provider,
-  );
+    middleWare,
+    provider);
 
-  router.get(`${xyzEnv.DIR}/api/sign{/:signer}`, sign);
+  router.get(`${xyzEnv.DIR}/api/sign{/:signer}`,
+    middleWare,
+    sign);
 
-  router.get(`${xyzEnv.DIR}/api/query{/:template}`, query);
+  router.get(`${xyzEnv.DIR}/api/query{/:template}`,
+    middleWare,
+    query);
 
   router.post(
     `${xyzEnv.DIR}/api/query{/:template}`,
     express.json({ limit: '5mb' }),
-    query,
-  );
+    middleWare,
+    query);
 
-  router.get(`${xyzEnv.DIR}/api/workspace{/:key}`, workspace);
+  router.get(`${xyzEnv.DIR}/api/workspace{/:key}`,
+    middleWare,
+    workspace);
 
-  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
+  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`,
+    middleWare,
+    user);
 
-  router.post(
-    `${xyzEnv.DIR}/api/user{/:method}`,
+  router.post(`${xyzEnv.DIR}/api/user{/:method}`,
     [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
-    user,
-  );
+    middleWare,
+    user);
 
-  router.get(`${xyzEnv.DIR}/view{/:template}`, view);
+  router.get(`${xyzEnv.DIR}/view{/:template}`,
+    middleWare,
+    view);
 
-  router.get(`${xyzEnv.DIR}/`, view);
+  router.get(`${xyzEnv.DIR}/`,
+    middleWare,
+    view);
 
   return router;
 }
