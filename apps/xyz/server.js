@@ -34,17 +34,17 @@ DIR - Base directory for routes
 RATE_LIMIT - Maximum requests per window (default: 1000)
 RATE_LIMIT_WINDOW - Time window in ms (default: 1 min)
 ```
+@requires router
 @requires express Web application framework
 @requires cookie-parser HTTP cookie parsing middleware
-@requires express-rate-limit Rate limiting middleware
 @requires /utils/processEnv
 */
 
+import createRouter from './router.js';
 import './mod/utils/processEnv.js';
 import express from 'express';
-import createRouter from '../../routerFactory.js';
-import validateRequestAuth from '../xyz/mod/middleware/validateRequestAuth.js';
-import validateRequestParams from '../xyz/mod/middleware/validateRequestParams.js';
+import validateRequestAuth from './mod/middleware/validateRequestAuth.js';
+import validateRequestParams from './mod/middleware/validateRequestParams.js';
 
 const router = createRouter([validateRequestParams, validateRequestAuth]);
 const app = express();

@@ -1,15 +1,38 @@
-import express from 'express';
-import { resolve } from 'node:path';
-import rateLimit from 'express-rate-limit';
-import cookieParser from 'cookie-parser';
-import './apps/xyz/mod/utils/processEnv.js';
-import provider from './apps/xyz/mod/provider/_provider.js';
-import query from './apps/xyz/mod/query.js';
-import sign from './apps/xyz/mod/sign/_sign.js';
-import user from './apps/xyz/mod/user/_user.js';
-import view from './apps/xyz/mod/view.js';
-import workspace from './apps/xyz/mod/workspace/_workspace.js';
+/**
+## /router
 
+Creates an express router object with base xyz endpoints.
+
+@requires express Web application framework
+@requires cookie-parser HTTP cookie parsing middleware
+@requires express-rate-limit Rate limiting middleware
+@requires /utils/processEnv
+
+@module router
+*/
+import { resolve } from 'node:path';
+import cookieParser from 'cookie-parser';
+import express from 'express';
+import './mod/utils/processEnv.js';
+import rateLimit from 'express-rate-limit';
+import provider from './mod/provider/_provider.js';
+import query from './mod/query.js';
+import sign from './mod/sign/_sign.js';
+import user from './mod/user/_user.js';
+import view from './mod/view.js';
+import workspace from './mod/workspace/_workspace.js';
+
+/**
+@function createRouter
+
+@description
+Creates an express router with xyz base endpoints.
+
+
+@param {Array<Function>} [middleWare] an optinal array of middleware functions to be run.
+
+@returns {Object} Returns an express router.
+**/
 function createRouter(middleWare = []) {
   const router = express.Router();
 
