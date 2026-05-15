@@ -52,6 +52,10 @@ export default async function auth(req, res) {
 
   if (req.headers.authorization) {
     const user = await fromACL(req);
+    if (typeof user === 'Error') {
+      res.status(401).send(user.message);
+      return;
+    }
     return user;
   }
 

@@ -49,11 +49,6 @@ export default async function validateRequestAuth(req, res, next) {
 
   // The authentication method returns an error.
   if (user && user instanceof Error) {
-    if (req.headers.authorization) {
-      // Request with failed authorization headers are not passed to login.
-      return res.status(401).send(user.message);
-    }
-
     // Remove cookie.
     res.setHeader(
       'Set-Cookie',
