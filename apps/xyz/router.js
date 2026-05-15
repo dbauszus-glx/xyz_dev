@@ -56,54 +56,42 @@ function createRouter(middleWare = []) {
   router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
   router.use(xyzEnv.DIR, express.static(publicDir));
 
-  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`,
-    middleWare,
-    user);
+  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, middleWare, user);
 
-  router.get(`${xyzEnv.DIR}/api/provider{/:provider}`,
-    middleWare,
-    provider);
+  router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, middleWare, provider);
 
   router.post(
     `${xyzEnv.DIR}/api/provider{/:provider}`,
     express.json({ limit: '5mb' }),
     middleWare,
-    provider);
+    provider,
+  );
 
-  router.get(`${xyzEnv.DIR}/api/sign{/:signer}`,
-    middleWare,
-    sign);
+  router.get(`${xyzEnv.DIR}/api/sign{/:signer}`, middleWare, sign);
 
-  router.get(`${xyzEnv.DIR}/api/query{/:template}`,
-    middleWare,
-    query);
+  router.get(`${xyzEnv.DIR}/api/query{/:template}`, middleWare, query);
 
   router.post(
     `${xyzEnv.DIR}/api/query{/:template}`,
     express.json({ limit: '5mb' }),
     middleWare,
-    query);
+    query,
+  );
 
-  router.get(`${xyzEnv.DIR}/api/workspace{/:key}`,
-    middleWare,
-    workspace);
+  router.get(`${xyzEnv.DIR}/api/workspace{/:key}`, middleWare, workspace);
 
-  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`,
-    middleWare,
-    user);
+  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, middleWare, user);
 
-  router.post(`${xyzEnv.DIR}/api/user{/:method}`,
+  router.post(
+    `${xyzEnv.DIR}/api/user{/:method}`,
     [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
     middleWare,
-    user);
+    user,
+  );
 
-  router.get(`${xyzEnv.DIR}/view{/:template}`,
-    middleWare,
-    view);
+  router.get(`${xyzEnv.DIR}/view{/:template}`, middleWare, view);
 
-  router.get(`${xyzEnv.DIR}/`,
-    middleWare,
-    view);
+  router.get(`${xyzEnv.DIR}/`, middleWare, view);
 
   return router;
 }

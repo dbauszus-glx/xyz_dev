@@ -19,9 +19,15 @@ import rootRedirect from '../xyz/mod/middleware/rootRedirect.js';
 import validateRequestParams from '../xyz/mod/middleware/validateRequestParams.js';
 import validateRequestAuth from '../xyz/mod/middleware/validateRequestAuth.js';
 
-const { custom_login, custom_logout, custom_verify } = await import('./customAuth.js');
+const { custom_login, custom_logout, custom_verify } = await import(
+  './customAuth.js'
+);
 
-const router = createRouter([rootRedirect, validateRequestParams, validateRequestAuth]);
+const router = createRouter([
+  rootRedirect,
+  validateRequestParams,
+  validateRequestAuth,
+]);
 
 router.get(`${xyzEnv.DIR}/custom/login`, custom_login);
 router.get(`${xyzEnv.DIR}/custom/logout`, custom_logout);
