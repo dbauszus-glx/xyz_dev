@@ -54,23 +54,12 @@ function createRouter(middleWare = []) {
 
   router.use(cookieParser());
 
-  //redirect if dir is missing in url path.
-  router.use((req, res, next) => {
-    if (/(?<=\/.well-known\/appspecific)/.test(req.url)) {
-      return;
-    }
-
-    if (xyzEnv.DIR && req.url.length === 1) {
-      res.setHeader('location', `${xyzEnv.DIR}`);
-      return res.status(302).send();
-    }
-    next();
-  });
-
   router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
   router.use(xyzEnv.DIR, express.static(publicDir));
 
-  middleWare && router.use(middleWare);
+  if (middleWare.length) {
+    router.use(middleWare);
+  }
 
   router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, user);
 

@@ -43,10 +43,16 @@ RATE_LIMIT_WINDOW - Time window in ms (default: 1 min)
 import createRouter from './router.js';
 import './mod/utils/processEnv.js';
 import express from 'express';
+import rootRedirect from './mod/middleware/rootRedirect.js';
 import validateRequestAuth from './mod/middleware/validateRequestAuth.js';
 import validateRequestParams from './mod/middleware/validateRequestParams.js';
 
-const router = createRouter([validateRequestParams, validateRequestAuth]);
+const router = createRouter([
+  rootRedirect,
+  validateRequestParams,
+  validateRequestAuth,
+]);
+
 const app = express();
 app.use(router);
 
