@@ -91,15 +91,6 @@ router.use((req, res, next) => {
 router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
 router.use(xyzEnv.DIR, express.static(publicDir));
 
-// redirect if dir is missing in url path.
-router.use((req, res, next) => {
-  if (xyzEnv.DIR && req.url.length === 1) {
-    res.setHeader('location', `${xyzEnv.DIR}`);
-    return res.status(302).send();
-  }
-  next();
-});
-
 router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, provider);
 
 router.post(
@@ -108,7 +99,7 @@ router.post(
   provider,
 );
 
-router.get(`${xyzEnv.DIR || ''}/api/sign{/:signer}`, sign);
+router.get(`${xyzEnv.DIR}/api/sign{/:signer}`, sign);
 
 router.get(`${xyzEnv.DIR}/api/query{/:template}`, query);
 
