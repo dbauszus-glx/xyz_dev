@@ -38,8 +38,6 @@ The view [template] is a HTML string. Template variables defined within a set of
 export default async function view(req, res) {
   Object.assign(req.params, req._params);
 
-  logger(req.url, 'view-req-url');
-
   // Property values in the params object will be substituted in the view template.
   const params = {};
 
