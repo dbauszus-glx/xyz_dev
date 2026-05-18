@@ -51,15 +51,6 @@ function createRouter(middleWare = []) {
 
   router.use(limiter);
 
-  // redirect if dir is missing in url path.
-  router.use((req, res, next) => {
-    if (xyzEnv.DIR && req.url.length === 1) {
-      res.setHeader('location', `${xyzEnv.DIR}`);
-      return res.status(302).send();
-    }
-    next();
-  });
-
   router.use(cookieParser());
 
   router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
