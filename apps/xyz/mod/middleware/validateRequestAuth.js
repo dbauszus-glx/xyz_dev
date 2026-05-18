@@ -54,7 +54,7 @@ export default async function validateRequestAuth(req, res, next) {
   // PRIVATE instances require user auth for all requests.
   if (!req.params.user && xyzEnv.PRIVATE) {
     if (loginRedirect(req, res)) {
-      // TODO investigate dev tool requests.
+      // The request has a redirect cookie.
       console.log(req.url);
       //return;
     }
