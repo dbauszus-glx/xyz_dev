@@ -33,20 +33,8 @@ export default async function validateRequestAuth(req, res, next) {
   // Assign _params object from validateRequestParams module to req.params.
   Object.assign(req.params, req._params);
 
-  // Short circuit to user/login.
-  if (req.params.login || req.body?.login) {
-    login(req, res);
-    return;
-  }
-
-  // Short circuit to user/register
-  if (req.params.register || req.body?.register) {
-    register(req, res);
-    return;
-  }
-
   // Validate signature of either request token, authorization header, or cookie.
-  const user = await auth(req, res);
+  req.params.user = await auth(req, res);
 
   // The auth module has sent a response.
   if (res.finished) return;
@@ -55,25 +43,14 @@ export default async function validateRequestAuth(req, res, next) {
   delete req.params.token;
 
   // The authentication method returns an error.
-  if (user instanceof Error) {
+  if (req.params.user instanceof Error) {
     // Remove cookie.
     res.setHeader(
       'Set-Cookie',
       `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`,
     );
 
-    res.status(401).send(user.message);
-    return;
-  }
-
-  // Set user as request parameter.
-  req.params.user = user;
-
-  // User route
-  if (req.url.match(/(?<=\/api\/user)/)) {
-    console.log(req.url);
-    //Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
-    next();
+    res.status(401).send(req.params.user.message);
     return;
   }
 
@@ -82,7 +59,7 @@ export default async function validateRequestAuth(req, res, next) {
     if (loginRedirect(req, res)) {
       // TODO investigate dev tool requests.
       console.log(req.url);
-      return;
+      //return;
     }
 
     if (xyzEnv.AUTH_PATH) {

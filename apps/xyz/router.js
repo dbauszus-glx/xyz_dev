@@ -19,6 +19,9 @@ import provider from './mod/provider/_provider.js';
 import query from './mod/query.js';
 import sign from './mod/sign/_sign.js';
 import user from './mod/user/_user.js';
+import login from './mod/user/login.js';
+import logout from './mod/user/logout.js';
+import register from './mod/user/register.js';
 import view from './mod/view.js';
 import workspace from './mod/workspace/_workspace.js';
 
@@ -56,8 +59,6 @@ function createRouter(middleWare = []) {
   router.use(`${xyzEnv.DIR}/public`, express.static(publicDir));
   router.use(xyzEnv.DIR, express.static(publicDir));
 
-  router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, middleWare, user);
-
   router.get(`${xyzEnv.DIR}/api/provider{/:provider}`, middleWare, provider);
 
   router.post(
@@ -70,7 +71,6 @@ function createRouter(middleWare = []) {
   router.get(`${xyzEnv.DIR}/api/sign{/:signer}`, middleWare, sign);
 
   router.get(`${xyzEnv.DIR}/api/query{/:template}`, middleWare, query);
-
   router.post(
     `${xyzEnv.DIR}/api/query{/:template}`,
     express.json({ limit: '5mb' }),
@@ -79,6 +79,22 @@ function createRouter(middleWare = []) {
   );
 
   router.get(`${xyzEnv.DIR}/api/workspace{/:key}`, middleWare, workspace);
+
+  router.get(`${xyzEnv.DIR}/api/user/login`, login);
+  router.post(
+    `${xyzEnv.DIR}/api/user/login`,
+    [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
+    login,
+  );
+
+  router.get(`${xyzEnv.DIR}/api/user/register`, register);
+  router.post(
+    `${xyzEnv.DIR}/api/user/register`,
+    [express.urlencoded({ extended: true }), express.json({ limit: '5mb' })],
+    register,
+  );
+
+  router.get(`${xyzEnv.DIR}/api/user/logout`, logout);
 
   router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, middleWare, user);
 

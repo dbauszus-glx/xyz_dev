@@ -88,11 +88,9 @@
 
     const language = languages.find(l => l.option === mapp.language);
 
-    const callbackRoute = document.body.dataset.template === 'login_view' ? 'login=true' : 'register=true';
-
     const selectLanguage = mapp.ui.elements.dropdown({
       callback: (e, entry) => {
-        globalThis.location.assign(`${mapp.host}?language=${entry.option}&${callbackRoute}`);
+        globalThis.location.assign(`${mapp.host}?language=${entry.option}`);
       },
       entries: languages,
       span: language.title,
