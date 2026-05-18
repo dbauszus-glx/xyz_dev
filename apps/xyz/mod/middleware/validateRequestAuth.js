@@ -44,8 +44,9 @@ export default async function validateRequestAuth(req, res, next) {
   // Remove token from params object.
   delete req.params.token;
 
+  // TODO test user error response from auth module.
   // The authentication method returns an error.
-  if (user && user instanceof Error) {
+  if (typeof user === 'Error') {
     // Remove cookie.
     res.setHeader(
       'Set-Cookie',

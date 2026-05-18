@@ -21,6 +21,7 @@ import sign from './mod/sign/_sign.js';
 import user from './mod/user/_user.js';
 import view from './mod/view.js';
 import workspace from './mod/workspace/_workspace.js';
+import providerRequestSignature from '../auth/providerRequestSignature.js';
 
 /**
 @function createRouter
