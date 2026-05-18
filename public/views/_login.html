@@ -105,7 +105,8 @@
     }
 
     const form = document.body.dataset.template === 'login_view' ?
-      mapp.ui.elements.loginForm(params) : mapp.ui.elements.registerForm(params);
+      mapp.ui.elements.loginForm(params) : 
+      mapp.ui.elements.registerForm(params);
 
     formwrapper.append(form);
   </script>
