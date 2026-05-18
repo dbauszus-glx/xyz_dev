@@ -33,18 +33,6 @@ export default async function validateRequestAuth(req, res, next) {
   // Assign _params object from validateRequestParams module to req.params.
   Object.assign(req.params, req._params);
 
-  if (req.params.logout) {
-    // Remove user cookie.
-    res.setHeader(
-      'Set-Cookie',
-      `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
-    );
-
-    res.setHeader('location', `${xyzEnv.DIR || '/'}`);
-    res.status(302).send();
-    return;
-  }
-
   // Short circuit to user/login.
   if (req.params.login || req.body?.login) {
     login(req, res);
@@ -83,6 +71,7 @@ export default async function validateRequestAuth(req, res, next) {
 
   // User route
   if (req.url.match(/(?<=\/api\/user)/)) {
+    console.log(req.url);
     //Requests to the User API maybe for login or registration and must be routed before the check for PRIVATE processes.
     next();
     return;
@@ -92,8 +81,8 @@ export default async function validateRequestAuth(req, res, next) {
   if (!req.params.user && xyzEnv.PRIVATE) {
     if (loginRedirect(req, res)) {
       // TODO investigate dev tool requests.
-      // console.log(req.url);
-      // return;
+      console.log(req.url);
+      return;
     }
 
     if (xyzEnv.AUTH_PATH) {

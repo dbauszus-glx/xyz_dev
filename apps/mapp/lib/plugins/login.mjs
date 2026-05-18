@@ -1,20 +1,18 @@
 /**
-### Login Plugin
-
-Dictionary entries:
-- toolbar_login
-- toolbar_logout
-
-@requires /dictionary
+### /plugins/login
 
 @module /plugins/login
- */
+*/
 
 /**
-Adds a login/logout button to the map view.
 @function login
-@param {Object} plugin - The plugin configuration object.
-@param {Object} mapview - The mapview object.
+@description
+The login plugin adds a login/logout button to the map view if the login feature is enabled by the presence of the data-login attribute in the document head.
+
+The button will link to either the login or logout endpoint depending on the user authentication state.
+
+@param {Object} plugin The plugin configuration object.
+@param {Object} mapview The mapview object.
 @returns {void}
 */
 export function login(plugin, mapview) {
@@ -26,25 +24,22 @@ export function login(plugin, mapview) {
   // Append login/logout link.
   if (!document.head.dataset.login) return;
 
-  const iconName = `${mapp.user ? 'logout' : 'lock_open'}`;
+  const iconName = mapp.user ? 'logout' : 'lock_open';
 
-  const iconClass =
-    'notranslate material-symbols-outlined' +
-    (mapp.user ? ' color-danger' : '');
+  const iconClass = `notranslate material-symbols-outlined ${mapp.user ? ' color-danger' : ''}`;
 
-  let userURL;
-  const authPath = document.head.dataset.authPath;
+  const authPath = document.head.dataset.authPath || '/api/user';
   const dir = document.head.dataset.dir || '';
 
-  if (mapp.user) {
-    userURL = authPath ? `${dir}${authPath}/logout` : '?logout=true';
-  } else {
-    userURL = authPath ? `${dir}${authPath}/login` : '?login=true';
-  }
+  const userURL = mapp.user
+    ? `${dir}${authPath}/logout`
+    : `${dir}${authPath}/login`;
 
-  btnColumn.appendChild(mapp.utils.html.node`
+  const btn = mapp.utils.html.node`
     <a
       title=${mapp.user ? mapp.dictionary.toolbar_logout : mapp.dictionary.toolbar_login}
       href=${userURL}>
-      <span class=${iconClass}>${iconName}`);
+      <span class=${iconClass}>${iconName}`;
+
+  btnColumn.append(btn);
 }
