@@ -33,7 +33,29 @@ export default async function validateRequestAuth(req, res, next) {
   // Assign _params object from validateRequestParams module to req.params.
   Object.assign(req.params, req._params);
 
-  authShortcircuit(req, res);
+  if (req.params.logout) {
+    // Remove user cookie.
+    res.setHeader(
+      'Set-Cookie',
+      `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
+    );
+
+    res.setHeader('location', `${xyzEnv.DIR || '/'}`);
+    res.status(302).send();
+    return;
+  }
+
+  // Short circuit to user/login.
+  if (req.params.login || req.body?.login) {
+    login(req, res);
+    return;
+  }
+
+  // Short circuit to user/register
+  if (req.params.register || req.body?.register) {
+    register(req, res);
+    return;
+  }
 
   // Validate signature of either request token, authorization header, or cookie.
   const user = await auth(req, res);
@@ -44,7 +66,6 @@ export default async function validateRequestAuth(req, res, next) {
   // Remove token from params object.
   delete req.params.token;
 
-  // TODO test user error response from auth module.
   // The authentication method returns an error.
   if (user instanceof Error) {
     // Remove cookie.
@@ -86,43 +107,6 @@ export default async function validateRequestAuth(req, res, next) {
   }
 
   next();
-}
-
-/**
- @function authShortcircuit
-
- Checks whether the incoming url is for logging/out or registration.
-
- Returns the relavant function call if this is the case
-
- @param req request object
- @param res response object.
-**/
-function authShortcircuit(req, res) {
-  const shortcircuit = { args: [] };
-  if (req.params.logout) {
-    // Remove cookie.
-    res.setHeader(
-      'Set-Cookie',
-      `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
-    );
-
-    // Set location to the domain path.
-    res.setHeader('location', `${xyzEnv.DIR || '/'}`);
-
-    return res.status(302).send();
-  }
-
-  // Short circuit to user/login.
-  if (req.params.login || req.body?.login) {
-    return login(req, res);
-    shortcircuit.args = [req, res];
-  }
-
-  // Short circuit to user/register
-  if (req.params.register || req.body?.register) {
-    return register(req, res);
-  }
 }
 
 /**
