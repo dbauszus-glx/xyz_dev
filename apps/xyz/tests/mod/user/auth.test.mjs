@@ -248,7 +248,7 @@ describe('auth:', async () => {
       const result = await auth(req, res);
 
       expect(result instanceof Error).toBeTruthy();
-      expect(result.message).toEqual('API Key mismatch');
+      expect(result.message).toEqual('API Key mismatch.');
     });
 
     it('api token correct', async () => {
