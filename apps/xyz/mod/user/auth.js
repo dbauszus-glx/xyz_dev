@@ -52,7 +52,7 @@ export default async function auth(req, res) {
 
   if (req.headers.authorization) {
     const user = await fromACL(req);
-    if (typeof user === 'Error') {
+    if (user instanceof Error) {
       res.status(401).send(user.message);
       return;
     }
@@ -79,19 +79,15 @@ export default async function auth(req, res) {
     return err;
   }
 
-  // Check req.param.token
   const tokenCheck = await checkParamToken(req, res, user);
 
   if (tokenCheck instanceof Error) {
-    // The token check has failed.
     return tokenCheck;
   }
 
-  // Check user.session
-  const sessionCheck = await checkSession(req, user);
+  const sessionCheck = await checkSession(req, res, user);
 
   if (sessionCheck instanceof Error) {
-    // The session check has failed.
     return sessionCheck;
   }
 
@@ -135,7 +131,6 @@ API keys do not expire. But changing the key in the ACL will immediately invalid
 
 @returns {Promise<Object|Error>} Method resolves to either a user object or Error
 */
-
 async function checkParamToken(req, res, user) {
   // A parameter token is required to be checked.
   if (!req.params.token) return;
@@ -152,22 +147,25 @@ async function checkParamToken(req, res, user) {
     );
 
     // The request for the stored API key has failed.
-    if (rows instanceof Error) return rows;
+    if (rows instanceof Error) {
+      return new Error('ACL not available.');
+    }
 
     // The user does not exist.
     if (rows.length === 0) {
-      return new Error('User not found');
+      return new Error('User not found.');
     }
 
     if (rows.blocked) {
       // The user is blocked.
-      return new Error('Account is blocked');
+      return new Error('Account is blocked.');
+      return;
     }
 
     if (rows[0].api !== req.params.token) {
       // API keys do not expire.
       // The stored key must match the request param token.
-      return new Error('API Key mismatch');
+      return new Error('API Key mismatch.');
     }
   }
 
@@ -175,7 +173,7 @@ async function checkParamToken(req, res, user) {
   delete user.admin;
 
   // Flag the user to be created from a token.
-  // It must not be possible created a new token from a token user.
+  // It must not be possible to create a new token from a token user.
   user.from_token = true;
 
   // Check whether the token matches cookie.
@@ -213,7 +211,7 @@ The session key will be updated on login, eg. on a different device. This will i
 @returns {Promise<Object|Error>} Method resolves to either a user object or Error
 */
 
-async function checkSession(req, user) {
+async function checkSession(req, res, user) {
   // Session checks are not applicable for requests with token.
   if (req.params.token) return;
 
@@ -246,15 +244,17 @@ async function checkSession(req, user) {
 
     // The request for the stored session has failed.
     if (rows instanceof Error) {
-      return rows;
+      return new Error('Failed to validate ACL for user session.');
     }
 
     if (user.session !== rows[0].session) {
       // The stored session doesn't match user.session.
-      return new Error('Session has been terminated. Please login again.');
+      return new Error('Session has been terminated.');
     }
 
     // Store user.session in user_sessions object.
     user_sessions[user.email] = user.session;
   }
+
+  return;
 }

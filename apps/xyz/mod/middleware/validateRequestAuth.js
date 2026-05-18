@@ -46,19 +46,15 @@ export default async function validateRequestAuth(req, res, next) {
 
   // TODO test user error response from auth module.
   // The authentication method returns an error.
-  if (typeof user === 'Error') {
+  if (user instanceof Error) {
     // Remove cookie.
     res.setHeader(
       'Set-Cookie',
       `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`,
     );
 
-    // Set msg parameter for the login view.
-    // The msg provides information in regards to failed logins.
-    req.params.msg = user.msg || user.message;
-
-    // Return login view with error message.
-    return login(req, res);
+    res.status(401).send(user.message);
+    return;
   }
 
   // Set user as request parameter.
