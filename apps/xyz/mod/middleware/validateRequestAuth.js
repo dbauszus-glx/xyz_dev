@@ -1,13 +1,12 @@
 /**
 ## /middleware/validateRequestAuth
 
+@requires [user/auth]{@link module:/user/auth}
+
 @module /middleware/validateRequestAuth
 */
 
-import { ServerResponse } from 'node:http';
 import auth from '../user/auth.js';
-import login from '../user/login.js';
-import register from '../user/register.js';
 
 /**
 @function validateRequestAuth
@@ -15,8 +14,6 @@ import register from '../user/register.js';
 
 @description
 The async validateRequestAuth will wait for the [user/auth]{@link module:/user/auth} module to return a user object.
-
-Requests without authorization headers will be redirected to the login if the user authentication errs.
 
 The user object will be assigned as to the req.params.
 
@@ -101,23 +98,13 @@ function loginRedirect(req, res) {
     return true;
   }
 
-  let redirectUrl =
-    req.url && decodeURIComponent(req.url).replace(/login=true/, '');
-
-  // Remove any characters that could be used for cookie injection
-  redirectUrl = redirectUrl.replaceAll(/[;\r\n]/g, '');
-
-  // Ensure it's a relative URL (it starts with '/')
-  if (!redirectUrl.startsWith('/')) {
-    redirectUrl = xyzEnv.DIR || '/';
-  }
-
-  // Encode the URL for safe storage in the cookie
-  const encodedRedirectUrl = encodeURIComponent(redirectUrl);
+  const redirectUrl = req.url.startsWith('/')
+    ? encodeURIComponent(req.url)
+    : xyzEnv.DIR || '/';
 
   const user_cookie = `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`;
 
-  const redirect_cookie = `${xyzEnv.TITLE}_redirect=${encodedRedirectUrl};HttpOnly;Max-Age=60;Path=${xyzEnv.DIR || '/'}`;
+  const redirect_cookie = `${xyzEnv.TITLE}_redirect=${redirectUrl};HttpOnly;Max-Age=60;Path=${xyzEnv.DIR || '/'}`;
 
   // Set cookie with properly encoded redirect value.
   res.setHeader('Set-Cookie', [user_cookie, redirect_cookie]);

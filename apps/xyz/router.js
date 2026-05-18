@@ -22,6 +22,7 @@ import user from './mod/user/_user.js';
 import login from './mod/user/login.js';
 import logout from './mod/user/logout.js';
 import register from './mod/user/register.js';
+import verify from './mod/user/verify.js';
 import view from './mod/view.js';
 import workspace from './mod/workspace/_workspace.js';
 
@@ -87,6 +88,8 @@ function createRouter(middleWare = []) {
     login,
   );
 
+  router.get(`${xyzEnv.DIR}/api/user/logout`, logout);
+
   router.get(`${xyzEnv.DIR}/api/user/register`, register);
   router.post(
     `${xyzEnv.DIR}/api/user/register`,
@@ -94,7 +97,7 @@ function createRouter(middleWare = []) {
     register,
   );
 
-  router.get(`${xyzEnv.DIR}/api/user/logout`, logout);
+  router.get(`${xyzEnv.DIR}/api/user/verify`, verify);
 
   router.get(`${xyzEnv.DIR}/api/user{/:method}{/:key}`, middleWare, user);
 
