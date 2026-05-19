@@ -112,6 +112,8 @@ function createRouter(middleWare = []) {
 
   router.get(`${xyzEnv.DIR}/`, middleWare, view);
 
+  router.get(`/`, middleWare, view);
+
   return router;
 }
 
