@@ -14,7 +14,7 @@ vi.mock('@geolytix/xyz-app/mod/user/fromACL.js', () => ({
   default: (...args) => fromACLFn(...args),
 }));
 
-const { readFileSync, readdirSync } = await import('fs');
+const { readFileSync, readdirSync } = await import('node:fs');
 const fsMockFn = vi.fn(readFileSync);
 const fsMockDirFn = vi.fn(readdirSync);
 vi.mock('fs', () => ({
@@ -24,8 +24,6 @@ vi.mock('fs', () => ({
 
 describe('auth:', async () => {
   const { default: auth } = await import('@geolytix/xyz-app/mod/user/auth.js');
-
-  const privateKey = 'PRIVATEKEY';
 
   globalThis.xyzEnv ??= {};
   globalThis.xyzEnv.FILE_RESOURCES = 'public';
