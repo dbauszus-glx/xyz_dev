@@ -6,7 +6,7 @@
     "dev": "node --inspect server.js"
   },
   "exports": {
-    ".": "./auth.js",
+    ".": "./customAuth.js",
     "./server": "./server.js"
   },
   "dependencies": {
