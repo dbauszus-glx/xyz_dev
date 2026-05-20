@@ -1,6 +1,5 @@
 {
   "name": "@geolytix/mapp",
-  "version": "v4.22.1",
   "type": "module",
   "repository": {
     "type": "git",
@@ -12,6 +11,6 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "catalog:"
   }
 }

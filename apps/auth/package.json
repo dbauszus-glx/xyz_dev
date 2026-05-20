@@ -1,6 +1,5 @@
 {
   "name": "@geolytix/xyz-auth-app",
-  "version": "v1.0.0",
   "description": "Optional custom auth backend app",
   "type": "module",
   "scripts": {
@@ -11,7 +10,7 @@
     "./server": "./server.js"
   },
   "dependencies": {
-    "@geolytix/xyz-app": "file:../xyz",
-    "express": "5.2.0"
+    "@geolytix/xyz-app": "workspace:*",
+    "express": "catalog:"
   }
 }
