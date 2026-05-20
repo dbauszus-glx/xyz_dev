@@ -51,15 +51,14 @@ export default async function auth(req, res) {
   if (acl === null) return null;
 
   if (req.headers.authorization) {
-    return await fromACL(req);
+    const user = await fromACL(req);
+    if (user instanceof Error) {
+      res.status(401).send(user.message);
+      return;
+    }
+    return user;
   }
 
-  //Verify signed urls
-  const signatureCheck = keyVerification(req, res);
-
-  if (signatureCheck || signatureCheck instanceof Error) {
-    return signatureCheck;
-  }
   // Get token from params or cookie.
   const token = req.params.token || req.cookies?.[xyzEnv.TITLE];
 
@@ -80,19 +79,15 @@ export default async function auth(req, res) {
     return err;
   }
 
-  // Check req.param.token
   const tokenCheck = await checkParamToken(req, res, user);
 
   if (tokenCheck instanceof Error) {
-    // The token check has failed.
     return tokenCheck;
   }
 
-  // Check user.session
-  const sessionCheck = await checkSession(req, user);
+  const sessionCheck = await checkSession(req, res, user);
 
   if (sessionCheck instanceof Error) {
-    // The session check has failed.
     return sessionCheck;
   }
 
@@ -116,73 +111,6 @@ export default async function auth(req, res) {
 }
 
 /**
-@function keyVerification
-
-@description
-The function attempts to validate the signature sent with the request.
-
-We compare the given signature to one calcualted from the key and the url.
-
-@param {req} req HTTP request.
-@param {res} res HTTP Response
-
-@returns {Object} returns an object containing whether or not the signature verification passed.
-*/
-function keyVerification(req, res) {
-  if (!req.params.signature) return null;
-
-  //Only use signature verification on provider endpoints.
-  if (!req.params.provider) return null;
-
-  req.params.expires ??= 0;
-
-  if (Number.parseInt(req.params.expires) < Date.parse(new Date())) {
-    return res
-      .status(401)
-      .setHeader('Content-Type', 'text/plain')
-      .send('Signature authentication failed');
-  }
-
-  if (!Object.hasOwn(xyzEnv.WALLET, req.params.key_id)) {
-    return res
-      .status(405)
-      .setHeader('Content-Type', 'text/plain')
-      .send('Signature authentication not configured');
-  }
-
-  try {
-    const privateKey = xyzEnv.WALLET[req.params.key_id];
-
-    //Build signature from key file and requested file url
-    const signature = crypto
-      .createHmac('sha256', privateKey)
-      .update(req.params.url)
-      .update(req.params.key_id)
-      .update(String(req.params.expires))
-      .digest('hex');
-
-    if (signature !== req.params.signature) {
-      return res
-        .status(401)
-        .setHeader('Content-Type', 'text/plain')
-        .send('Signature authentication failed');
-    }
-
-    //Delete params that are no longer required.
-    delete req.params.signature;
-    delete req.params.key_id;
-    delete req.params.expires;
-
-    //Keep track that this is a signed request.
-    req.params.signed = true;
-
-    return { signature_auth: true };
-  } catch (error) {
-    console.err(error);
-  }
-}
-
-/**
 @function checkParamToken
 @async
 
@@ -203,7 +131,6 @@ API keys do not expire. But changing the key in the ACL will immediately invalid
 
 @returns {Promise<Object|Error>} Method resolves to either a user object or Error
 */
-
 async function checkParamToken(req, res, user) {
   // A parameter token is required to be checked.
   if (!req.params.token) return;
@@ -220,22 +147,25 @@ async function checkParamToken(req, res, user) {
     );
 
     // The request for the stored API key has failed.
-    if (rows instanceof Error) return rows;
+    if (rows instanceof Error) {
+      return new Error('ACL not available.');
+    }
 
     // The user does not exist.
     if (rows.length === 0) {
-      return new Error('User not found');
+      return new Error('User not found.');
     }
 
     if (rows.blocked) {
       // The user is blocked.
-      return new Error('Account is blocked');
+      return new Error('Account is blocked.');
+      return;
     }
 
     if (rows[0].api !== req.params.token) {
       // API keys do not expire.
       // The stored key must match the request param token.
-      return new Error('API Key mismatch');
+      return new Error('API Key mismatch.');
     }
   }
 
@@ -243,7 +173,7 @@ async function checkParamToken(req, res, user) {
   delete user.admin;
 
   // Flag the user to be created from a token.
-  // It must not be possible created a new token from a token user.
+  // It must not be possible to create a new token from a token user.
   user.from_token = true;
 
   // Check whether the token matches cookie.
@@ -281,7 +211,7 @@ The session key will be updated on login, eg. on a different device. This will i
 @returns {Promise<Object|Error>} Method resolves to either a user object or Error
 */
 
-async function checkSession(req, user) {
+async function checkSession(req, res, user) {
   // Session checks are not applicable for requests with token.
   if (req.params.token) return;
 
@@ -314,15 +244,17 @@ async function checkSession(req, user) {
 
     // The request for the stored session has failed.
     if (rows instanceof Error) {
-      return rows;
+      return new Error('Failed to validate ACL for user session.');
     }
 
     if (user.session !== rows[0].session) {
       // The stored session doesn't match user.session.
-      return new Error('Session has been terminated. Please login again.');
+      return new Error('Session has been terminated.');
     }
 
     // Store user.session in user_sessions object.
     user_sessions[user.email] = user.session;
   }
+
+  return;
 }

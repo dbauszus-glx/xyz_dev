@@ -36,6 +36,8 @@ The view [template] is a HTML string. Template variables defined within a set of
 @property {Object} [params.user] Requesting user.
 */
 export default async function view(req, res) {
+  Object.assign(req.params, req._params);
+
   // Property values in the params object will be substituted in the view template.
   const params = {};
 

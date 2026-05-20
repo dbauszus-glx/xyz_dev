@@ -42,6 +42,8 @@ The content type is derived from the requested resource if the URL ends with a J
 @returns {Promise} The promise resolves into the response from the provider modules method.
 */
 export default async function provider(req, res) {
+  Object.assign(req.params, req._params);
+
   if (!Object.hasOwn(providerModules, req.params.provider)) {
     return res.status(404).send('Failed to validate provider param.');
   }

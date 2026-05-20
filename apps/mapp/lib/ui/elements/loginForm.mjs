@@ -18,7 +18,7 @@ Creates a login form used in user login view.
 export default function loginForm(params = {}) {
   params.msg ??= '';
   params.formAction = `${mapp.host}/api/user/login?language=${mapp.language}`;
-  params.register ??= `${mapp.host}/api/user/register?language=${mapp.language}&register=true`;
+  params.register ??= `${mapp.host}/api/user/register?language=${mapp.language}`;
   params.classList ??= '';
   params.login_email ??= mapp.dictionary.login_email;
   params.login_password ??= mapp.dictionary.login_password;

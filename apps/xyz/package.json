@@ -2,17 +2,14 @@
   "name": "@geolytix/xyz-app",
   "type": "module",
   "exports": {
-    ".": "./api.js",
-    "./api": "./api.js",
-    "./extensions": "./extensions.js",
     "./mod/*": "./mod/*",
-    "./server": "./server.js"
+    "./server": "./server.js",
+    "./router": "./router.js"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/geolytix/xyz"
   },
-  "packageManager": "pnpm@10.10.0",
   "scripts": {
     "dev": "node --inspect server.js",
     "test": "vitest run",

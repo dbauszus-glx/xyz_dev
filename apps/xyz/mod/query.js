@@ -50,6 +50,8 @@ The rows returned from the dbs_connection are then passed to the sendRows() meth
 @property {integer} [params.statement_timeout] Timeout for database connection.
 */
 export default async function query(req, res) {
+  Object.assign(req.params, req._params);
+
   // Get workspace from cache.
   req.params.workspace = await workspaceCache();
 
