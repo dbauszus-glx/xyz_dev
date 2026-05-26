@@ -42,7 +42,9 @@ export default function Tabview(tabview) {
     tabview.node.appendChild(mapp.utils.html.node`<div class="panel">`);
 
   // Set data attribute ID from element ID.
-  tabview.id && tabview.node.setAttribute('data-id', tabview.id);
+  if (tabview.id) {
+    tabview.node.dataset.id = tabview.id;
+  }
 
   tabview.addTab = addTab;
 
@@ -211,7 +213,7 @@ function addTab(entry) {
 
     tabview.timer = window.setTimeout(() => entry.activate(), 500);
 
-    if (tabview.showTab instanceof Function) {
+    if (typeof tabview.showTab === 'function') {
       // Execute tabview method to show a tab.
       tabview.showTab();
     }
