@@ -143,23 +143,20 @@ export default async function query(req, res) {
 
   logger(query, 'query');
 
-  // Nonblocking queries will not wait for results but return immediately.
-  if (template.nonblocking) {
-    dbs_connections[template.dbs](
-      query,
-      req.params.SQL,
-      template.statement_timeout,
-    );
-
-    return res.send('Non blocking request sent.');
-  }
-
-  // Run the query
-  const rows = await dbs_connections[template.dbs](
+  const queryPromise = dbs_connections[template.dbs](
     query,
     req.params.SQL,
     template.statement_timeout,
   );
+
+  // Nonblocking queries will not wait for results but return immediately.
+  if (template.nonblocking) {
+
+    return res.send(`Non blocking request sent at ${new Date().toISOString()}.`);
+  }
+
+  // Run the query
+  const rows = await queryPromise;
 
   sendRows(res, template, rows);
 }
