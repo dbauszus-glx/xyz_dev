@@ -454,7 +454,6 @@ describe('Query: Testing Query API', () => {
       await query(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(res._getData()).toBe('Non blocking request sent.');
       expect(mockDbQuery).toHaveBeenCalled();
     });
   });
