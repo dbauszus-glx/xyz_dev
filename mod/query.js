@@ -150,7 +150,7 @@ export default async function query(req, res) {
 
   // Nonblocking queries will not wait for results but return immediately.
   if (template.nonblocking) {
-    return res.send(
+    return res.status(202).send(
       `Non blocking request sent at ${new Date().toISOString()}.`,
     );
   }

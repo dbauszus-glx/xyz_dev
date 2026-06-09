@@ -452,7 +452,7 @@ describe('Query: Testing Query API', () => {
 
       await query(req, res);
 
-      expect(res.statusCode).toBe(200);
+      expect(res.statusCode).toBe(202);
       expect(mockDbQuery).toHaveBeenCalled();
     });
   });
