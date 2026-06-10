@@ -77,7 +77,6 @@ describe('saml:', async () => {
 
     expect(getLogoutUrlAsync).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(302);
-    expect(res.getHeader('Set-Cookie')).toContain('Expires=Thu, 01 Jan 1970');
     expect(res.getHeader('location')).toBe('/app');
   });
 

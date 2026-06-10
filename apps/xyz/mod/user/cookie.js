@@ -62,7 +62,7 @@ export default async function cookie(req, res) {
     // Remove cookie.
     res.setHeader(
       'Set-Cookie',
-      `${xyzEnv.TITLE}=null;Max-Age=0;${xyzEnv.COOKIE_PROPS}`,
+      `${xyzEnv.TITLE}=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`,
     );
     return res.send('This too shall pass');
   }
@@ -91,7 +91,7 @@ export default async function cookie(req, res) {
       if (rows instanceof Error) {
         res.setHeader(
           'Set-Cookie',
-          `${xyzEnv.TITLE}=null;Max-Age=0;${xyzEnv.COOKIE_PROPS}`,
+          `${xyzEnv.TITLE}=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`,
         );
         return res.status(500).send('Failed to retrieve user from ACL');
       }
@@ -109,7 +109,7 @@ export default async function cookie(req, res) {
       if (user.blocked) {
         res.setHeader(
           'Set-Cookie',
-          `${xyzEnv.TITLE}=null;Max-Age=0;${xyzEnv.COOKIE_PROPS}`,
+          `${xyzEnv.TITLE}=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`,
         );
         return res.status(403).send('Account is blocked');
       }
