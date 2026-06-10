@@ -714,7 +714,7 @@ function sendRows(res, template, rows) {
     res
       .status(202)
       .setHeader('Content-Type', 'text/plain')
-      .send('No row returned any value.');
+      .send('No rows returned from table.');
     return;
   }
 
