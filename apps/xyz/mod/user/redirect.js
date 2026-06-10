@@ -51,7 +51,7 @@ export default async function redirect(req, res, user) {
     if (rows instanceof Error) {
       res.setHeader(
         'Set-Cookie',
-        `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
+        `${xyzEnv.TITLE}=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`,
       );
       return res.status(500).send('Failed to retrieve user from ACL');
     }
@@ -63,7 +63,7 @@ export default async function redirect(req, res, user) {
     if (rows[0].blocked) {
       res.setHeader(
         'Set-Cookie',
-        `${xyzEnv.TITLE}=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`,
+        `${xyzEnv.TITLE}=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`,
       );
       return res.status(403).send('User blocked in ACL.');
     }
@@ -84,11 +84,11 @@ export default async function redirect(req, res, user) {
     algorithm: xyzEnv.SECRET_ALGORITHM,
   });
 
-  const user_cookie = `${xyzEnv.TITLE}=${token};HttpOnly;Max-Age=${xyzEnv.COOKIE_TTL};Path=${xyzEnv.DIR || '/'};SameSite=Strict${(!req.headers.host.includes('localhost') && ';Secure') || ''}`;
+  const user_cookie = `${xyzEnv.TITLE}=${token}; Max-Age=${xyzEnv.COOKIE_TTL}; ${xyzEnv.COOKIE_PROPS}`;
 
   const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
 
-  const redirect_cookie = `${xyzEnv.TITLE}_redirect=null;HttpOnly;Max-Age=0;Path=${xyzEnv.DIR || '/'}`;
+  const redirect_cookie = `${xyzEnv.TITLE}_redirect=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`;
 
   const location = redirectLocation(redirect);
 
