@@ -188,6 +188,7 @@ async function acs(req, res, strategy, redirectUser) {
       nameID: samlResponse.profile.nameID,
       nameIDFormat: samlResponse.profile.nameIDFormat,
       nameQualifier: samlResponse.profile.nameQualifier,
+      redirect: req.body?.RelayState || req.query?.RelayState,
       sessionIndex: samlResponse.profile.sessionIndex,
       spNameQualifier: samlResponse.profile.spNameQualifier,
     };

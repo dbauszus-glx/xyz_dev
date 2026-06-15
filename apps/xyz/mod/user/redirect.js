@@ -22,7 +22,7 @@ A user object from the acl module is performed with the lookup property flag in 
 
 A user cookie is signed with the jsonwebtoken library and set on the response header.
 
-The method checks for a redirect location on a `_redirect` cookie and sets the location header to the redirect location or the base directory if no redirect cookie is found.
+The method checks for a redirect location on the user object or a `_redirect` cookie and sets the location header to the redirect location or the base directory if no redirect target is found.
 
 The redirect cookie is destroyed [set to NULL] with the response header.
 
@@ -33,6 +33,7 @@ The response is sent with a 302 status code to redirect the client to the locati
 @param {object} user The user object should contain an email property and optionally a lookup property which will trigger a lookup in the ACL for the user email to assign any additional properties from the ACL to the user object before signing the cookie.
 @property {string} user.email The email property is required to lookup the user in the ACL and assign any additional properties to the user object before signing the cookie.
 @property {boolean} [user.lookup] The lookup property flag will trigger a lookup in the ACL for the user email to assign any additional properties to the user object before signing the cookie.
+@property {string} [user.redirect] Redirect target provided by an authentication flow such as SAML RelayState.
 */
 export default async function redirect(req, res, user) {
   if (user.lookup) {
@@ -79,14 +80,15 @@ export default async function redirect(req, res, user) {
     Object.assign(user, rows[0]);
   }
 
+  const redirect = user.redirect || req.cookies?.[`${xyzEnv.TITLE}_redirect`];
+  delete user.redirect;
+
   const token = sign(user, xyzEnv.SECRET, {
     expiresIn: xyzEnv.COOKIE_TTL,
     algorithm: xyzEnv.SECRET_ALGORITHM,
   });
 
   const user_cookie = `${xyzEnv.TITLE}=${token}; Max-Age=${xyzEnv.COOKIE_TTL}; ${xyzEnv.COOKIE_PROPS}`;
-
-  const redirect = req.cookies?.[`${xyzEnv.TITLE}_redirect`];
 
   const redirect_cookie = `${xyzEnv.TITLE}_redirect=null; Max-Age=0; ${xyzEnv.COOKIE_PROPS}`;
 

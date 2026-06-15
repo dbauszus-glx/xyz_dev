@@ -156,6 +156,45 @@ describe('saml:', async () => {
 
     await samlWithRedirect(req, res);
 
+    const cookies = res.getHeader('Set-Cookie');
+    const token = cookies[0].match(/^TEST_APP=([^;]+)/)[1];
+
+    expect(jwt.decode(token)).not.toHaveProperty('redirect');
+    expect(res.statusCode).toBe(302);
+    expect(res.getHeader('location')).toBe('/app/dashboard');
+  });
+
+  it('redirects to query RelayState after ACS when provided outside the POST body', async () => {
+    aclFn.mockResolvedValueOnce([
+      {
+        admin: true,
+        approved: true,
+        blocked: false,
+        email: 'test@example.com',
+        language: 'en',
+        roles: ['admin'],
+        verified: true,
+      },
+    ]);
+
+    validatePostResponseAsync.mockResolvedValueOnce({
+      profile: {
+        email: 'test@example.com',
+        nameID: 'name-id',
+      },
+    });
+
+    const samlWithRedirect = createSamlHandler(strategy);
+
+    const { req, res } = createMocks({
+      body: { SAMLResponse: 'response' },
+      cookies: {},
+      query: { RelayState: encodeURIComponent('/app/dashboard') },
+      url: '/app/saml/acs',
+    });
+
+    await samlWithRedirect(req, res);
+
     expect(res.statusCode).toBe(302);
     expect(res.getHeader('location')).toBe('/app/dashboard');
   });
