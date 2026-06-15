@@ -70,22 +70,37 @@ export default async function getLocale(params, parentLocale) {
     ? params.locale.shift()
     : params.locale;
 
-  let locale = await loadLocale(workspace, localeKey);
+  let locale;
+
+  await loadLocale(locale, workspace, localeKey);
 
   if (locale instanceof Error) {
     return new Error(locale.message);
   }
 
-  locale = await processRoles(locale, parentLocale, params);
+  await processRoles(locale, parentLocale, params);
 
   if (locale instanceof Error) {
     return locale;
   }
 
-  return await composeLocale(locale, parentLocale, params, workspace.key);
+  await composeLocale(locale, parentLocale, params, workspace.key);
+
+  return locale;
 }
 
-async function loadLocale(workspace, key) {
+/**
+@function loadLocale
+@async
+
+@description
+TODO
+
+@param {locale} locale
+@param {workspace} workspace
+@param {string} key
+*/
+async function loadLocale(locale, workspace, key) {
   let locale;
 
   if (!key || key === 'locale') {
@@ -97,7 +112,7 @@ async function loadLocale(workspace, key) {
   }
 
   // This is to prevent that locale in the workspace is modified.
-  return structuredClone(locale);
+  locale = structuredClone(locale);
 }
 
 /**
@@ -139,19 +154,17 @@ async function processRoles(locale, parentLocale, params) {
 
   // The mergeTemplates method returned an Error.
   if (locale instanceof Error) {
-    return locale;
+    return;
   }
 
   // Strict Role Check
   if (params.ignoreRoles) {
-    return locale;
+    return;
   }
 
   if (!Roles.check(locale.roles, params.user?.roles)) {
-    return new Error('Role access denied.');
+    locale = new Error('Role access denied.');
   }
-
-  return locale;
 }
 
 /**
@@ -222,6 +235,4 @@ async function composeLocale(locale, parentLocale, params, workspaceKey) {
   delete locale.templates;
   delete locale._type;
   delete locale.localesRoleContext;
-
-  return locale;
 }
