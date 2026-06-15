@@ -32,7 +32,7 @@ globalThis.xyzEnv = {
 };
 
 describe('saml:', async () => {
-  const { createSamlHandler } = await import('../../../saml/saml.js');
+  const { createSamlHandler } = await import('../saml.js');
   const saml = createSamlHandler(strategy, redirectFn);
 
   beforeEach(() => {
