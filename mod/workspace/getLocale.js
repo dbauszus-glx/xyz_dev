@@ -98,12 +98,12 @@ TODO
 
 @param {locale} locale
 @param {workspace} workspace
-@param {string} key
+@param {string} [key='locale'] Key of locale object in the workspace.
 */
-async function loadLocale(locale, workspace, key) {
+async function loadLocale(locale, workspace, key = 'locale') {
   let locale;
 
-  if (!key || key === 'locale') {
+  if (key === 'locale') {
     locale = workspace.locale;
   } else if (Object.hasOwn(workspace.locales, key)) {
     locale = workspace.locales[key];
