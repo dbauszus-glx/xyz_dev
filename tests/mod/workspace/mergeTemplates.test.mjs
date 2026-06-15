@@ -5,7 +5,7 @@ describe('mergeTemplates', async () => {
     '../../../mod/workspace/mergeTemplates.js'
   );
 
-  it('get template from workspace', async () => {
+  it('get template from workspace and exclude style property', async () => {
     const obj = {
       template: {
         src: 'file:./tests/assets/layers/template_test/layer.json',
@@ -16,6 +16,70 @@ describe('mergeTemplates', async () => {
     const template = await mergeTemplates(obj, null, false);
 
     expect(Object.hasOwn(template, 'style')).toBeFalsy();
+  });
+
+  it('get template and templates from workspace and exclude style property from original template', async () => {
+    const obj = {
+      template: {
+        src: 'file:./tests/assets/layers/template_test/layer.json',
+        exclude_props: ['style', 'table'],
+      },
+      templates: [
+        {
+          style: {
+            default: {
+              icon: {
+                type: 'dot',
+                fillColor: '#00ff00',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const template = await mergeTemplates(obj, null, false);
+
+    // Here we expect the original style property was skipped, and the templates style property was merged in.
+    expect(Object.hasOwn(template, 'style')).toBeTruthy();
+    expect(template.style.default.icon.fillColor).toEqual('#00ff00');
+    // We expect not to see the table property from the original template, but we should see the style property from the templates array.
+    expect(Object.hasOwn(template, 'table')).toBeFalsy();
+  });
+
+  it('get template and templates from workspace and include just the name property from original template', async () => {
+    const obj = {
+      template: {
+        src: 'file:./tests/assets/layers/template_test/layer.json',
+        include_props: ['table'],
+      },
+      templates: [
+        {
+          style: {
+            default: {
+              icon: {
+                type: 'dot',
+                fillColor: '#00ff00',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const template = await mergeTemplates(obj, null, false);
+
+    // Here we expect the original table property was included, and the templates style property was merged in.
+    expect(Object.hasOwn(template, 'table')).toBeTruthy();
+    expect(Object.hasOwn(template, 'style')).toBeTruthy();
+    // We expect that no other keys are present other than table and style from the merge. A template will always have roles and dbs properties.
+    expect(Object.keys(template).sort()).toEqual([
+      'dbs',
+      'roles',
+      'style',
+      'table',
+    ]);
+    expect(template.style.default.icon.fillColor).toEqual('#00ff00');
   });
 
   it('check roles object merge', async () => {
@@ -77,7 +141,6 @@ describe('mergeTemplates', async () => {
       localeRole: 'locale',
       template: {
         src: 'file:./tests/assets/layers/template_test/nested_templates.json',
-        exclude_props: ['style'],
       },
     };
 
@@ -208,6 +271,35 @@ describe('mergeTemplates', async () => {
       'locale.layer_a.draw_point.nested_draw_point',
       'nested_draw_point',
     ].sort();
+
+    const templateRoles = Object.keys(template.roles).sort();
+
+    // Check no other roles are present other than expected.
+    expect(expectedRoles).toEqual(templateRoles);
+  });
+
+  it('mergeTemplates using roles object should not create dot notation roles', async () => {
+    // This test is designed to ensure that backwards compatibility is maintained with templates that use the "roles" object instead of "localeRole" and "role".
+    // The test is similar to the previous one but uses "roles" object instead of dot notation roles.
+    // The expected result is that the same roles are present in the final template, but without the dot notation.
+    const obj = {
+      roles: {
+        Super: null,
+        Standard: null,
+        A: null,
+      },
+      template: {
+        src: 'file:./tests/assets/layers/template_test/roles_template.json',
+      },
+    };
+
+    // Call the template as if i have role "A".
+    const roles = ['A'];
+
+    const template = await mergeTemplates(obj, roles);
+
+    // Check the roles object contains just the expected roles without dot notation.
+    const expectedRoles = ['Super', 'Standard', 'A'].sort();
 
     const templateRoles = Object.keys(template.roles).sort();
 
