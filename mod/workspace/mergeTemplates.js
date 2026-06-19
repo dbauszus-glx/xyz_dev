@@ -65,6 +65,7 @@ export default async function mergeTemplates(obj, roles) {
       obj = await objTemplate(obj, _template, roles, context);
     }
   } else if (obj.templates instanceof Object) {
+    // TODO: This fail check should probably happen earlier.
     const err = `${obj.key} Object must be a templates Array.`;
     obj.err ??= [];
     obj.err.push(err);
@@ -148,12 +149,14 @@ async function objTemplate(obj, template, roles, context) {
     template,
   ));
 
-  return await processRecursiveTemplates(
+  obj = await processRecursiveTemplates(
     obj,
     nextTemplates,
     roles,
     nextTemplatesContext,
   );
+
+  return obj;
 }
 
 /**
@@ -271,11 +274,9 @@ async function processRecursiveTemplates(
   nextTemplatesContext,
 ) {
   if (obj.template) {
-    return await objTemplate(obj, obj.template, roles, getRoleContext(obj));
+    obj = await objTemplate(obj, obj.template, roles, getRoleContext(obj));
   } else if (Array.isArray(nextTemplates)) {
-    // Use the template's own role context if available, so that nested
-    // sub-templates are combined only with their parent template's roles
-    // rather than the accumulated roles of the entire object.
+    // Use the template's own role context if available, so that nested sub-templates are combined only with their parent template's roles rather than the accumulated roles of the entire object.
     const context = nextTemplatesContext || getRoleContext(obj);
     for (const _template of nextTemplates) {
       obj = await objTemplate(obj, _template, roles, context);
