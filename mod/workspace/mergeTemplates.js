@@ -132,7 +132,7 @@ async function objTemplate(obj, template, roles, context) {
     return obj;
   }
 
-  template = prepareTemplate(obj, template, roles);
+  template = filterProperties(obj, template, roles);
 
   let nextTemplates;
   let nextTemplatesContext;
@@ -153,10 +153,14 @@ async function objTemplate(obj, template, roles, context) {
 }
 
 /**
-@function prepareTemplate
+@function filterProperties
 
 @description
 Prepares a template for merging by applying role-based property overrides and filtering properties based on include/exclude lists.
+
+The method checks whether the template object has an array property include_props and will iterate through the string entries in the array to remove all other properties from the template object.
+
+Properties defined in the template object exclude_props array property will removed from the template object.
 
 @param {Object} obj The parent object providing include/exclude property configuration.
 @param {Object} template The template to prepare.
@@ -164,14 +168,29 @@ Prepares a template for merging by applying role-based property overrides and fi
 
 @returns {Object} The prepared template with role overrides applied and properties filtered.
 */
-function prepareTemplate(obj, template, roles) {
+function filterProperties(obj, template, roles) {
   template = Roles.objMerge(template, roles);
 
-  //use the base obj exclude/include props as we need that for the templateProperties method.
   template.exclude_props = obj.exclude_props ?? template.exclude_props;
   template.include_props = obj.include_props ?? template.include_props;
 
-  return templateProperties(template);
+  if (Array.isArray(template.exclude_props)) {
+    for (const prop of template.exclude_props) {
+      if (template.hasOwnProperty(prop)) {
+        delete template[prop];
+      }
+    }
+  }
+  if (Array.isArray(template.include_props)) {
+    const _template = {};
+    for (const prop of template.include_props) {
+      if (template.hasOwnProperty(prop)) {
+        _template[prop] = template[prop];
+      }
+    }
+    return _template;
+  }
+  return template;
 }
 
 /**
@@ -345,36 +364,4 @@ function assignWorkspaceTemplates(obj) {
       assignWorkspaceTemplates(entry[1]);
     }
   });
-}
-
-/**
-@function templateProperties
-
-@description
-The method checks whether the template object has an array property include_props and will iterate through the string entries in the array to remove all other properties from the template object.
-
-Properties defined in the template object exclude_props array property will removed from the template object.
-@param {Object} template
-@property {array} template.include_props Remove all but these properties from template object.
-@property {array} template.exclude_props Remove these properties from template object.
-@returns {Object} template
-*/
-function templateProperties(template) {
-  if (Array.isArray(template.exclude_props)) {
-    for (const prop of template.exclude_props) {
-      if (template.hasOwnProperty(prop)) {
-        delete template[prop];
-      }
-    }
-  }
-  if (Array.isArray(template.include_props)) {
-    const _template = {};
-    for (const prop of template.include_props) {
-      if (template.hasOwnProperty(prop)) {
-        _template[prop] = template[prop];
-      }
-    }
-    return _template;
-  }
-  return template;
 }
