@@ -64,14 +64,7 @@ export default async function mergeTemplates(obj, roles) {
     for (const _template of obj.templates) {
       obj = await objTemplate(obj, _template, roles, context);
     }
-  } else if (obj.templates instanceof Object) {
-    // TODO: This fail check should probably happen earlier.
-    const err = `${obj.key} Object must be a templates Array.`;
-    obj.err ??= [];
-    obj.err.push(err);
-    console.warn(err);
   }
-
   // Substitute ${SRC_*} in object string.
   obj = envReplace(obj);
 
@@ -310,7 +303,6 @@ function getRoleContext(obj) {
 
 /**
 @function assignWorkspaceTemplates
-
 
 @description
 The method parses an object for a template object property.

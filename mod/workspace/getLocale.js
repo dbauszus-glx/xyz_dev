@@ -70,8 +70,20 @@ export default async function getLocale(params, parentLocale) {
     ? params.locale.shift()
     : params.locale;
 
-  let locale = await loadLocale(workspace, localeKey);
+  let locale;
 
+  if (!localeKey || localeKey === 'locale') {
+    // The workspace.locale must not be modified.
+    locale = structuredClone(workspace.locale);
+  } else if (Object.hasOwn(workspace.locales, key)) {
+    // Workspace locales must not be modified.
+    locale = structuredClone(workspace.locales[key]);
+  } else {
+    // getTemplate returns a structuredClone.
+    locale = await getTemplate(key);
+  }
+
+  // TODO: why is a new Error created from an Error?
   if (locale instanceof Error) {
     return new Error(locale.message);
   }
@@ -82,22 +94,9 @@ export default async function getLocale(params, parentLocale) {
     return locale;
   }
 
-  return await composeLocale(locale, parentLocale, params, workspace.key);
-}
+  locale = await composeLocale(locale, parentLocale, params, workspace.key);
 
-async function loadLocale(workspace, key) {
-  let locale;
-
-  if (!key || key === 'locale') {
-    locale = workspace.locale;
-  } else if (Object.hasOwn(workspace.locales, key)) {
-    locale = workspace.locales[key];
-  } else {
-    locale = await getTemplate(key);
-  }
-
-  // This is to prevent that locale in the workspace is modified.
-  return structuredClone(locale);
+  return locale;
 }
 
 /**
@@ -125,16 +124,14 @@ If the parentLocale has a localesRoleContext property (set by mergeTemplates whe
 */
 async function processRoles(locale, parentLocale, params) {
   // Assign parent roles to locale for combination.
-  // Use the scoped localesRoleContext if available, so that nested locales
-  // are combined only with the template's roles that contributed the locales
-  // array, not accumulated sibling template roles.
+  // Use the scoped localesRoleContext if available, so that nested locales are combined only with the template's roles that contributed the locales array, not accumulated sibling template roles.
   if (parentLocale?.roles) {
     const roleContext = parentLocale.localesRoleContext || parentLocale;
     Roles.combine(locale, roleContext);
   }
 
   // Pass params.user.roles to enforce role checks on merged templates.
-  // The role check for the locale itself will be performed after the mergeTemplates method.
+  // TODO: ensure that the roles are checked in the mergeTemplates
   locale = await mergeTemplates(locale, params.user?.roles);
 
   // The mergeTemplates method returned an Error.
@@ -209,6 +206,7 @@ async function composeLocale(locale, parentLocale, params, workspaceKey) {
   }
 
   if (Array.isArray(params.locale) && params.locale.length > 0) {
+    // TODO: What happens if getLocale returns an error?
     locale = await getLocale(params, locale);
   }
 
