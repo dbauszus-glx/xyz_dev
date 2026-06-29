@@ -60,14 +60,17 @@ export default async function mergeTemplates(obj, roles) {
   if (typeof obj.template === 'string' || obj.template instanceof Object) {
     obj = await objTemplate(obj, obj.template, roles, context);
     if (obj instanceof Error) return obj;
-  }
-
-  // TODO the templates should be assigned after the template not if else
-  if (Array.isArray(obj.templates)) {
+  } else if (Array.isArray(obj.templates)) {
     for (const _template of obj.templates) {
       obj = await objTemplate(obj, _template, roles, context);
     }
+  } else if (obj.templates instanceof Object) {
+    const err = `${obj.key} Object must be a templates Array.`;
+    obj.err ??= [];
+    obj.err.push(err);
+    console.warn(err);
   }
+
   // Substitute ${SRC_*} in object string.
   obj = envReplace(obj);
 
@@ -135,22 +138,29 @@ async function objTemplate(obj, template, roles, context) {
     return obj;
   }
 
-  template = filterProperties(obj, template, roles);
+  template = prepareTemplate(obj, template, roles);
 
-  await objMerge(obj, template, roles);
+  let nextTemplates;
+  let nextTemplatesContext;
 
-  return obj;
+  ({ obj, nextTemplates, nextTemplatesContext } = mergeObjectWithTemplate(
+    obj,
+    template,
+  ));
+
+  return await processRecursiveTemplates(
+    obj,
+    nextTemplates,
+    roles,
+    nextTemplatesContext,
+  );
 }
 
 /**
-@function filterProperties
+@function prepareTemplate
 
 @description
 Prepares a template for merging by applying role-based property overrides and filtering properties based on include/exclude lists.
-
-The method checks whether the template object has an array property include_props and will iterate through the string entries in the array to remove all other properties from the template object.
-
-Properties defined in the template object exclude_props array property will removed from the template object.
 
 @param {Object} obj The parent object providing include/exclude property configuration.
 @param {Object} template The template to prepare.
@@ -158,83 +168,120 @@ Properties defined in the template object exclude_props array property will remo
 
 @returns {Object} The prepared template with role overrides applied and properties filtered.
 */
-function filterProperties(obj, template, roles) {
+function prepareTemplate(obj, template, roles) {
   template = Roles.objMerge(template, roles);
 
+  //use the base obj exclude/include props as we need that for the templateProperties method.
   template.exclude_props = obj.exclude_props ?? template.exclude_props;
   template.include_props = obj.include_props ?? template.include_props;
 
-  if (Array.isArray(template.exclude_props)) {
-    for (const prop of template.exclude_props) {
-      if (template.hasOwnProperty(prop)) {
-        delete template[prop];
-      }
-    }
-  }
-  if (Array.isArray(template.include_props)) {
-    const _template = {};
-    for (const prop of template.include_props) {
-      if (template.hasOwnProperty(prop)) {
-        _template[prop] = template[prop];
-      }
-    }
-    return _template;
-  }
-  return template;
+  return templateProperties(template);
 }
 
-async function objMerge(obj, template, roles) {
+/**
+@function mergeObjectWithTemplate
+
+@description
+Merges a template into the parent object. Handles two cases:
+
+1. obj.template (singular): The object inherits from a single template. The obj is merged on top of the template.
+2. templates[] array item: A template from the array is merged into the existing object.
+
+When a template from the templates[] array has its own nested sub-templates, the template's role context is captured before the merge. This prevents sibling template roles from leaking into the sub-template role combinations.
+
+Similarly, when a template contributes a locales array, the template's role context is stored as localesRoleContext on the merged object. This allows getLocale to scope role combinations for nested locales to the template that defined them, rather than the fully accumulated parent.
+
+@param {Object} obj The parent object to merge the template into.
+@param {Object} template The resolved template object.
+
+@returns {Object} An object containing the merged obj, any nextTemplates to process, and an optional nextTemplatesContext scoped to the template's roles.
+*/
+function mergeObjectWithTemplate(obj, template) {
   let nextTemplates;
   let nextTemplatesContext;
 
   if (obj.template) {
-    // obj = await objTemplate(obj, obj.template, roles, getRoleContext(obj));
-
-    if (template.template) {
-      delete template.template;
-    }
-
     // obj.template must NOT overwrite template.template.
     delete obj.template;
-
     // Merge obj --> template
     obj = merge(template, obj);
-  } // else {
 
-  if (Array.isArray(template.templates)) {
-    nextTemplates = template.templates;
-    delete template.templates;
+    if (obj.templates) {
+      nextTemplates = obj.templates;
+      delete obj.templates;
+    }
+  } else {
+    if (Array.isArray(template.templates)) {
+      nextTemplates = template.templates;
+      delete template.templates;
 
-    // Capture the template's role context before merging into obj. This ensures nested sub-templates are combined only with their parent template's roles, not accumulated sibling roles.
-    nextTemplatesContext = getRoleContext(template);
+      // Capture the template's role context before merging into obj.
+      // This ensures nested sub-templates are combined only with
+      // their parent template's roles, not accumulated sibling roles.
+      nextTemplatesContext = getRoleContext(template);
+    }
 
-    // Use the template's own role context if available, so that nested sub-templates are combined only with their parent template's roles rather than the accumulated roles of the entire object.
+    // When a template contributes a locales array, capture its role context
+    // so that nested locales are combined only with the template's roles,
+    // not accumulated sibling template roles.
+    if (Array.isArray(template.locales)) {
+      template.localesRoleContext = getRoleContext(template);
+    }
+
+    // template.role must NOT overwrite obj.role.
+    if (Object.hasOwn(obj, 'role')) delete template.role;
+
+    // template.key must NOT overwrite obj.key.
+    delete template.key;
+
+    // template.template must NOT overwrite obj.template.
+    delete template.template;
+
+    // Merge template --> obj
+    obj = merge(obj, template);
+  }
+
+  return { obj, nextTemplates, nextTemplatesContext };
+}
+
+/**
+@function processRecursiveTemplates
+@async
+
+@description
+Processes any remaining templates that need to be merged after the initial template merge.
+
+If the merged object now has an obj.template property, it is processed as a single template inheritance.
+
+If nextTemplates exist (from a template's own templates[] array), they are processed sequentially using the nextTemplatesContext. This scoped context ensures that sub-templates are combined only with their parent template's roles, preventing sibling template roles from polluting the role hierarchy.
+
+For example, given templates: [demographics, stores] where stores has templates: [brand_a], the brand_a template will be combined with the stores role context only, not with the accumulated demographics roles.
+
+@param {Object} obj The current merged object.
+@param {Array} [nextTemplates] Templates to process recursively.
+@param {Array|boolean} roles User roles or true for admin.
+@param {Object} [nextTemplatesContext] Role context scoped to the parent template, used to prevent sibling role leakage.
+
+@returns {Promise<Object>} The fully merged object.
+*/
+async function processRecursiveTemplates(
+  obj,
+  nextTemplates,
+  roles,
+  nextTemplatesContext,
+) {
+  if (obj.template) {
+    return await objTemplate(obj, obj.template, roles, getRoleContext(obj));
+  } else if (Array.isArray(nextTemplates)) {
+    // Use the template's own role context if available, so that nested
+    // sub-templates are combined only with their parent template's roles
+    // rather than the accumulated roles of the entire object.
     const context = nextTemplatesContext || getRoleContext(obj);
     for (const _template of nextTemplates) {
-      if (_template.template) {
-        delete _template.template;
-      }
       obj = await objTemplate(obj, _template, roles, context);
     }
   }
-
-  //   // Capture role context to prevent mingling of sibling roles.
-  //   if (Array.isArray(template.locales)) {
-  //     template.localesRoleContext = getRoleContext(template);
-  //   }
-
-  //   // template.role must NOT overwrite obj.role.
-  //   if (Object.hasOwn(obj, 'role')) delete template.role;
-
-  //   // template.key must NOT overwrite obj.key.
-  //   delete template.key;
-
-  //   // template.template must NOT overwrite obj.template.
-  //   delete template.template;
-
-  //   // Merge template --> obj
-  //   obj = merge(obj, template);
-  // }
+  return obj;
 }
 
 /**
@@ -262,6 +309,7 @@ function getRoleContext(obj) {
 
 /**
 @function assignWorkspaceTemplates
+
 
 @description
 The method parses an object for a template object property.
@@ -304,4 +352,36 @@ function assignWorkspaceTemplates(obj) {
       assignWorkspaceTemplates(entry[1]);
     }
   });
+}
+
+/**
+@function templateProperties
+
+@description
+The method checks whether the template object has an array property include_props and will iterate through the string entries in the array to remove all other properties from the template object.
+
+Properties defined in the template object exclude_props array property will removed from the template object.
+@param {Object} template
+@property {array} template.include_props Remove all but these properties from template object.
+@property {array} template.exclude_props Remove these properties from template object.
+@returns {Object} template
+*/
+function templateProperties(template) {
+  if (Array.isArray(template.exclude_props)) {
+    for (const prop of template.exclude_props) {
+      if (template.hasOwnProperty(prop)) {
+        delete template[prop];
+      }
+    }
+  }
+  if (Array.isArray(template.include_props)) {
+    const _template = {};
+    for (const prop of template.include_props) {
+      if (template.hasOwnProperty(prop)) {
+        _template[prop] = template[prop];
+      }
+    }
+    return _template;
+  }
+  return template;
 }
