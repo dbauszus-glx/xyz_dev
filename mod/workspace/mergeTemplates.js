@@ -1,14 +1,6 @@
 /**
 ## /workspace/mergeTemplates
 
-The workspace is cached in the module scope to allow for the mergeObjectTemplates(layer) method to assign template objects defined in a JSON layer to the workspace.templates{}.
-
-@requires /utils/roles
-@requires /utils/merge
-@requires /utils/envReplace
-@requires /workspace/getTemplate
-@requires /workspace/cache
-
 @module /workspace/mergeTemplates
 */
 
@@ -37,50 +29,33 @@ An array of templates can be defined as obj.templates[]. The templates will be m
 @param {array} [roles] An array of user roles from request params.
 
 @property {string} [obj.template] Key of template for the object.
-@property {string} obj.key Fallback for lookup of template if not an implicit property.
 @property {array} [obj.templates] An array of template keys to be merged into the object.
-
-@returns {Promise} The layer or locale provided as obj param.
 */
 export default async function mergeTemplates(obj, roles) {
   // Cache workspace in module scope for template assignment.
   workspace = await workspaceCache();
 
-  obj = Roles.objMerge(obj, roles);
+  await objTemplate(obj, obj.template, roles, true);
 
-  obj.roles ??= {};
-
-  if (obj.role) {
-    obj.roles[obj.role] ??= true;
-  }
-
-  // Process templates with the object's original role identity as context.
-  const context = getRoleContext(obj);
-
-  if (typeof obj.template === 'string' || obj.template instanceof Object) {
-    obj = await objTemplate(obj, obj.template, roles, context);
-    if (obj instanceof Error) return obj;
-  }
+  // This would only happen if the user does not have access to the object after it has been merged into the template [prototype].
+  if (obj instanceof Error) return obj;
 
   // TODO the templates should be assigned after the template not if else
   if (Array.isArray(obj.templates)) {
-    for (const _template of obj.templates) {
-      obj = await objTemplate(obj, _template, roles, context);
+    for (const template of obj.templates) {
+      await objTemplate(obj, template, roles);
     }
   }
-  // Substitute ${SRC_*} in object string.
-  obj = envReplace(obj);
+  // // Substitute ${SRC_*} in object string.
+  // obj = envReplace(obj);
 
   // Assign templates to workspace.
-  assignWorkspaceTemplates(obj);
+  //assignWorkspaceTemplates(obj);
 
-  // Assign default workspace dbs if not defined in template.
-  obj.dbs ??= workspace.dbs;
-
-  //If the user is an admin we don't need to check roles
-  if (!Roles.check(obj, roles)) {
-    return new Error('Role access denied.');
-  }
+  // //If the user is an admin we don't need to check roles
+  // if (!Roles.check(obj, roles)) {
+  //   return new Error('Role access denied.');
+  // }
 
   return obj;
 }
@@ -105,12 +80,13 @@ Templates defined in the obj.templates array will be merged into object.
 @param {Object} obj
 @param {Object} template The template maybe an object with a src property or a string.
 @param {array} roles An array of user roles from request params.
-@param {Object} [context] Optional base roles for context.
 @property {string} [obj.template] Key of template for the object.
 
 @returns {Promise<Object>} Returns the merged obj.
 */
-async function objTemplate(obj, template, roles, context) {
+async function objTemplate(obj, template, roles, reverse) {
+  if (template === undefined) return;
+
   template = await getTemplate(template);
 
   // Failed to get template matching obj.template from template.src!
@@ -120,26 +96,21 @@ async function objTemplate(obj, template, roles, context) {
     return obj;
   }
 
-  template = structuredClone(template);
+  template = filterProperties(obj, template);
 
-  // Combine roles using the static context if provided, otherwise the current object state.
-  Roles.combine(template, context || obj);
+  if (reverse) {
 
-  if (roles !== true && !Roles.check(template, roles)) {
-    if (obj.template) {
-      obj.roles = {
-        ...template.roles,
-        ...obj.roles,
-      };
-    }
-    return obj;
+    // Merge obj --> template
+    obj = merge(template, obj);
+    parseTemplates(obj);
+    return;
+
   }
 
-  template = filterProperties(obj, template, roles);
+  parseTemplates(template);
 
-  await objMerge(obj, template, roles);
-
-  return obj;
+  // Merge template --> obj
+  obj = merge(obj, template);
 }
 
 /**
@@ -154,13 +125,10 @@ Properties defined in the template object exclude_props array property will remo
 
 @param {Object} obj The parent object providing include/exclude property configuration.
 @param {Object} template The template to prepare.
-@param {Array|boolean} roles User roles for role-specific property merging.
 
 @returns {Object} The prepared template with role overrides applied and properties filtered.
 */
-function filterProperties(obj, template, roles) {
-  template = Roles.objMerge(template, roles);
-
+function filterProperties(obj, template) {
   template.exclude_props = obj.exclude_props ?? template.exclude_props;
   template.include_props = obj.include_props ?? template.include_props;
 
@@ -183,125 +151,46 @@ function filterProperties(obj, template, roles) {
   return template;
 }
 
-async function objMerge(obj, template, roles) {
-  let nextTemplates;
-  let nextTemplatesContext;
-
-  if (obj.template) {
-    // obj = await objTemplate(obj, obj.template, roles, getRoleContext(obj));
-
-    if (template.template) {
-      delete template.template;
-    }
-
-    // obj.template must NOT overwrite template.template.
-    delete obj.template;
-
-    // Merge obj --> template
-    obj = merge(template, obj);
-  } // else {
-
-  if (Array.isArray(template.templates)) {
-    nextTemplates = template.templates;
-    delete template.templates;
-
-    // Capture the template's role context before merging into obj. This ensures nested sub-templates are combined only with their parent template's roles, not accumulated sibling roles.
-    nextTemplatesContext = getRoleContext(template);
-
-    // Use the template's own role context if available, so that nested sub-templates are combined only with their parent template's roles rather than the accumulated roles of the entire object.
-    const context = nextTemplatesContext || getRoleContext(obj);
-    for (const _template of nextTemplates) {
-      if (_template.template) {
-        delete _template.template;
-      }
-      obj = await objTemplate(obj, _template, roles, context);
-    }
-  }
-
-  //   // Capture role context to prevent mingling of sibling roles.
-  //   if (Array.isArray(template.locales)) {
-  //     template.localesRoleContext = getRoleContext(template);
-  //   }
-
-  //   // template.role must NOT overwrite obj.role.
-  //   if (Object.hasOwn(obj, 'role')) delete template.role;
-
-  //   // template.key must NOT overwrite obj.key.
-  //   delete template.key;
-
-  //   // template.template must NOT overwrite obj.template.
-  //   delete template.template;
-
-  //   // Merge template --> obj
-  //   obj = merge(obj, template);
-  // }
-}
-
 /**
-@function getRoleContext
+@function parseTemplates
 
 @description
-Extracts the role-related properties from an object to provide a stable context for template processing.
-
-Used in two ways:
-1. Captured from the parent object before iterating its templates[] array, preventing sibling templates from leaking roles into each other.
-2. Captured from a template before merging it into the parent, so that the template's own sub-templates are scoped to the template's roles rather than the accumulated parent roles.
-
-@param {Object} obj The object to extract role context from.
-@returns {Object} A context object containing role, roles, localeRole, templateRole, and objRole.
-*/
-function getRoleContext(obj) {
-  return {
-    role: obj.role,
-    roles: structuredClone(obj.roles),
-    localeRole: obj.localeRole,
-    templateRole: obj.templateRole,
-    objRole: obj.objRole,
-  };
-}
-
-/**
-@function assignWorkspaceTemplates
-
-@description
-The method parses an object for a template object property.
-
-The template property value will be assigned to the workspace.templates{} object matching the template key value.
-
-The template._type property will be set to 'template' indicating that the templates origin is in the workspace.
-
-It is possible to overassign _type:'core' templates which are loaded from the /mod/workspace/templates directory.
-
-The method will call itself for nested objects.
 
 @param {Object} obj
 */
-function assignWorkspaceTemplates(obj) {
+function parseTemplates(obj) {
   // Return early if object is null or empty
   if (obj === null) return;
 
   if (obj instanceof Object && !Object.keys(obj)) return;
 
-  Object.entries(obj).forEach((entry) => {
+  for (const [key, val] of Object.entries(obj)) {
     // Process template objects - if found, add type and merge into workspace templates
-    if (entry[0] === 'template' && entry[1].key) {
-      entry[1]._type = 'template';
-      workspace.templates[entry[1].key] = Object.assign(
-        workspace.templates[entry[1].key] || {},
-        entry[1],
+    if (key === 'template' && val.key) {
+      val._type = 'template';
+      workspace.templates[val.key] = Object.assign(
+        workspace.templates[val.key] || {},
+        val,
       );
-      return;
+      delete obj.template;
+      continue;
+    }
+
+    if (key === 'templates' && Array.isArray(val)) {
+      // TODO: merge templates into workspace.templates
+      console.log(val);
+      continue;
     }
 
     // Recursively process each item if we find an array
-    if (Array.isArray(entry[1])) {
-      entry[1].forEach(assignWorkspaceTemplates);
-      return;
+    if (Array.isArray(val)) {
+      val.forEach(parseTemplates);
+      continue;
     }
 
     // Recursively process nested objects
-    if (entry[1] instanceof Object) {
-      assignWorkspaceTemplates(entry[1]);
+    if (val instanceof Object) {
+      parseTemplates(val);
     }
-  });
+  }
 }

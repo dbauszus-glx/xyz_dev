@@ -88,7 +88,8 @@ export default async function getLocale(params, parentLocale) {
     return new Error(locale.message);
   }
 
-  locale = await processRoles(locale, parentLocale, params);
+  // TODO disabled until template composition is fixed to not modify the workspace templates.
+  //locale = await processRoles(locale, parentLocale, params);
 
   if (locale instanceof Error) {
     return locale;
