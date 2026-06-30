@@ -24,7 +24,7 @@ const { cacheWorkspaceTemplates } = await import(
   '../mod/workspace/_workspace.js'
 );
 
-const workspace = await cacheWorkspaceTemplates({ force: true });
+const workspace = await cacheWorkspaceTemplates();
 
 if (workspace instanceof Error) {
   throw workspace;
