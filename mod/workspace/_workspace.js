@@ -727,8 +727,8 @@ cleared before generation.
 
 @returns {Promise<Object|Error>} Generated workspace or an Error.
 */
-export async function cacheWorkspaceTemplates(params = {}) {
-  workspace = await workspaceCache(params.force ?? true);
+export async function cacheWorkspaceTemplates() {
+  workspace = await workspaceCache(true);
 
   if (workspace instanceof Error) {
     return workspace;
