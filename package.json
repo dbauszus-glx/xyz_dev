@@ -22,7 +22,8 @@
     "mapp-docs": "jsdoc --configure ./utils/jsdoc_mapp.json --verbose",
     "xyz-docs": "jsdoc --configure ./utils/jsdoc_xyz.json --verbose",
     "test-docs": "jsdoc --configure ./utils/jsdoc_test.json --verbose",
-    "push-env": "node ./utils/sync-vercel-env.js"
+    "push-env": "node ./utils/sync-vercel-env.js",
+    "workspace:cache": "node ./utils/cache-workspace.js"
   },
   "license": "MIT",
   "optionalDependencies": {

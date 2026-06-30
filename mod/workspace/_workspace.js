@@ -32,6 +32,7 @@ The workspace object defines the mapp resources available in an XYZ instance.
 */
 
 import { createHash } from 'node:crypto';
+import envReplace from '../utils/envReplace.js';
 import logger from '../utils/logger.js';
 import * as Roles from '../utils/roles.js';
 import workspaceCache from './cache.js';
@@ -471,7 +472,7 @@ async function test(req, res) {
   );
 
   // Create clone of workspace_templates
-  testConfig.unused_templates = new Set([...testConfig.workspace_templates]);
+  testConfig.unused_templates = new Set(testConfig.workspace_templates);
   testConfig.overwritten_templates = new Set();
 
   testWorkspaceLocales(testConfig);
@@ -694,6 +695,203 @@ async function cacheTemplates(params) {
   }
 
   return cache;
+}
+
+/**
+@function cacheWorkspaceTemplates
+@async
+
+@description
+Build-time workspace cache method used by the workspace generation script. The
+method lives in the workspace module so it can reuse the same workspace cache and
+getTemplate behaviour as the API without going through an HTTP-only response
+path.
+
+The workspace is parsed for every non-module src property. All matching source
+templates found in the current pass are cached, then only those newly cached
+templates are parsed for additional src properties. This repeats until no new src
+templates are discovered.
+
+Each unique src is fetched once and stored in a srcMap. Repeated references in
+the same pass are assigned from that single cached template. When a template
+references a src that already exists in its current src path, the reference is
+left untouched to avoid expanding circular sources such as a template that calls
+itself.
+
+Module templates should keep their src because dynamic render functions cannot be
+serialised into generated workspace JSON.
+
+@param {Object} [params] Workspace cache parameters.
+@property {Boolean} [params.force=true] Whether the cached workspace should be
+cleared before generation.
+
+@returns {Promise<Object|Error>} Generated workspace or an Error.
+*/
+export async function cacheWorkspaceTemplates(params = {}) {
+  workspace = await workspaceCache(params.force ?? true);
+
+  if (workspace instanceof Error) {
+    return workspace;
+  }
+
+  // Track state for this generated cache run only.
+  const state = {
+    errors: [],
+    parsedSrc: new Set(),
+    srcMap: new Map(),
+    workspace,
+  };
+
+  await cacheTemplateSources([{ obj: workspace, srcPath: new Set() }], state);
+
+  if (state.errors.length) {
+    return new Error(state.errors.join('\n'));
+  }
+
+  return workspace;
+}
+
+/**
+@function cacheTemplateSources
+@async
+
+@description
+Processes a queue of objects whose src properties need to be discovered. Each
+queue pass collects src references from the queued objects, caches the templates
+for those sources, and queues only the objects that were newly cached. This keeps
+later passes focused on templates introduced by the previous pass rather than
+re-scanning the whole workspace.
+
+@param {Array<Object>} queue Objects to scan with their current src path.
+@param {Object} state Shared cache state with srcMap, parsedSrc, errors, and workspace.
+*/
+async function cacheTemplateSources(queue, state) {
+  // Process one queue snapshot at a time. Newly cached templates are appended to
+  // the queue for the next pass.
+  while (queue.length > 0) {
+    const srcRefs = new Map();
+
+    // Group all src references found in this pass so each unique src is loaded
+    // once and then assigned to every object that referenced it.
+    for (const item of queue.splice(0)) {
+      collectSrcRefs(item.obj, item.srcPath, srcRefs, new WeakSet());
+    }
+
+    // Cache each unique src and enqueue only newly populated objects for the
+    // next pass, where newly introduced src values can be discovered.
+    for (const [src, refs] of srcRefs) {
+      queue.push(...(await cacheSourceRefs(src, refs, state)));
+    }
+  }
+}
+
+async function cacheSourceRefs(src, refs, state) {
+  // Do not expand a src that is already in this branch path; this prevents
+  // circular templates from recursively caching themselves forever.
+  const refsToCache = refs.filter((ref) => !ref.srcPath.has(src));
+
+  if (refsToCache.length === 0) return [];
+
+  let template = state.srcMap.get(src);
+
+  // Reuse the template for repeated src references during this generation run.
+  if (!template) {
+    template = await loadSourceTemplate(src, state);
+    state.srcMap.set(src, template);
+  }
+
+  if (template instanceof Error) {
+    state.errors.push(template.message);
+    return [];
+  }
+
+  // Inline the cached template where the src was declared and remove src to mark
+  // that object as cached in the generated workspace.
+  for (const ref of refsToCache) {
+    Object.assign(ref.obj, template);
+    delete ref.obj.src;
+  }
+
+  // A repeated src has already been scanned for nested src values, so it does
+  // not need to be queued again.
+  if (state.parsedSrc.has(src)) return [];
+
+  state.parsedSrc.add(src);
+
+  return refsToCache.map((ref) => ({
+    obj: ref.obj,
+    srcPath: new Set([...ref.srcPath, src]),
+  }));
+}
+
+/**
+@function collectSrcRefs
+
+@description
+Walks an object tree and groups non-module src references by normalized src
+value. The object that owns the src is retained so the cached template can be
+assigned back to the same location in the generated workspace.
+
+@param {Object|Array} obj Object or array to inspect.
+@param {Set<String>} srcPath Source chain for circular reference detection.
+@param {Map<String, Array<Object>>} srcRefs Grouped source references.
+@param {WeakSet<Object>} objects Objects already visited during this scan.
+*/
+function collectSrcRefs(obj, srcPath, srcRefs, objects) {
+  if (!obj || typeof obj !== 'object') return;
+
+  // Avoid walking the same object twice in one scan if objects are shared.
+  if (objects.has(obj)) return;
+  objects.add(obj);
+
+  if (Array.isArray(obj)) {
+    obj.forEach((item) => collectSrcRefs(item, srcPath, srcRefs, objects));
+    return;
+  }
+
+  if (typeof obj.src === 'string') {
+    obj.src = envReplace(obj.src);
+
+    // Module templates stay as runtime imports because render functions cannot
+    // be represented in generated JSON.
+    if (!obj.module) {
+      const refs = srcRefs.get(obj.src) || [];
+      refs.push({ obj, srcPath });
+      srcRefs.set(obj.src, refs);
+    }
+  }
+
+  Object.values(obj).forEach((value) =>
+    collectSrcRefs(value, srcPath, srcRefs, objects),
+  );
+}
+
+/**
+@function loadSourceTemplate
+@async
+
+@description
+Loads a source through getTemplate so provider lookup, env replacement, response
+assignment, and error handling remain aligned with runtime template loading.
+Anonymous src objects are cached by getTemplate under the src key; that temporary
+entry is removed unless it already existed before this generated cache pass.
+
+@param {String} src Normalized source reference.
+@param {Object} state Shared cache state.
+
+@returns {Promise<Object|Error>} Loaded template or Error.
+*/
+async function loadSourceTemplate(src, state) {
+  const hasTemplate = Object.hasOwn(state.workspace.templates, src);
+  const template = await getTemplate({ src });
+
+  // getTemplate caches anonymous src objects under the src key. That key is only
+  // a temporary generation detail unless it existed before this run.
+  if (!hasTemplate) {
+    delete state.workspace.templates[src];
+  }
+
+  return template;
 }
 
 /**
