@@ -712,8 +712,10 @@ templates found in the current pass are cached, then only those newly cached
 templates are parsed for additional src properties. This repeats until no new src
 templates are discovered.
 
-Each unique src is fetched once and stored in a srcMap. Repeated references in
-the same pass are assigned from that single cached template. When a template
+Each unique src is fetched once and stored in a srcMap. This is source-load
+de-duplication only; duplicate template keys are handled by mergeTemplates during
+composition. Repeated references in the same pass are assigned from that single
+cached template. When a template
 references a src that already exists in its current src path, the reference is
 left untouched to avoid expanding circular sources such as a template that calls
 itself.
@@ -737,7 +739,7 @@ export async function cacheWorkspaceTemplates() {
   // Track state for this generated cache run only.
   const state = {
     errors: [],
-    parsedSrc: new Set(),
+    scannedSrc: new Set(),
     srcMap: new Map(),
     workspace,
   };
@@ -763,7 +765,7 @@ later passes focused on templates introduced by the previous pass rather than
 re-scanning the whole workspace.
 
 @param {Array<Object>} queue Objects to scan with their current src path.
-@param {Object} state Shared cache state with srcMap, parsedSrc, errors, and workspace.
+@param {Object} state Shared cache state with srcMap, scannedSrc, errors, and workspace.
 */
 async function cacheTemplateSources(queue, state) {
   // Process one queue snapshot at a time. Newly cached templates are appended to
@@ -813,10 +815,11 @@ async function cacheSourceRefs(src, refs, state) {
   }
 
   // A repeated src has already been scanned for nested src values, so it does
-  // not need to be queued again.
-  if (state.parsedSrc.has(src)) return [];
+  // not need to be queued again. Template-key de-duplication is handled later by
+  // mergeTemplates; this only avoids re-scanning source content.
+  if (state.scannedSrc.has(src)) return [];
 
-  state.parsedSrc.add(src);
+  state.scannedSrc.add(src);
 
   return refsToCache.map((ref) => ({
     obj: ref.obj,
