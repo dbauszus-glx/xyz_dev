@@ -17,13 +17,6 @@ let workspace;
 @async
 
 @description
-The mergeTemplates method will be called for a layer or locale obj.
-
-The locale or layer object will be merged with a template defined as obj.template string property.
-
-The method will check for a template matching the obj.key string property if obj.template is undefined.
-
-An array of templates can be defined as obj.templates[]. The templates will be merged into the obj in the order the template keys are in the templates[] array.
 
 @param {Object} obj
 @param {array} [roles] An array of user roles from request params.
@@ -35,7 +28,7 @@ export default async function mergeTemplates(obj, roles) {
   // Cache workspace in module scope for template assignment.
   workspace = await workspaceCache();
 
-  await objTemplate(obj, obj.template, roles, true);
+  await objTemplateComposition(obj, obj.template, roles, true);
 
   // This would only happen if the user does not have access to the object after it has been merged into the template [prototype].
   if (obj instanceof Error) return obj;
@@ -43,14 +36,12 @@ export default async function mergeTemplates(obj, roles) {
   // TODO the templates should be assigned after the template not if else
   if (Array.isArray(obj.templates)) {
     for (const template of obj.templates) {
-      await objTemplate(obj, template, roles);
+      await objTemplateComposition(obj, template, roles);
     }
   }
   // // Substitute ${SRC_*} in object string.
   // obj = envReplace(obj);
 
-  // Assign templates to workspace.
-  //assignWorkspaceTemplates(obj);
 
   // //If the user is an admin we don't need to check roles
   // if (!Roles.check(obj, roles)) {
@@ -65,26 +56,14 @@ export default async function mergeTemplates(obj, roles) {
 @async
 
 @description
-The method will request a template object from the getTemplate module method.
-
-Possible error from the template fetch will be added to the obj.err[] array before the obj is returned.
-
-The template will be checked against the request user roles.
-
-The method will shortcircuit if roles restrict access to the template object.
-
-Otherwise the obj will be merged into the template.
-
-Templates defined in the obj.templates array will be merged into object.
 
 @param {Object} obj
-@param {Object} template The template maybe an object with a src property or a string.
-@param {array} roles An array of user roles from request params.
-@property {string} [obj.template] Key of template for the object.
+@param {Object} [template] The template maybe an object with a src property or a string.
+@param {array} [roles] An array of user roles from request params.
 
 @returns {Promise<Object>} Returns the merged obj.
 */
-async function objTemplate(obj, template, roles, reverse) {
+async function objTemplateComposition(obj, template, roles, reverse) {
   if (template === undefined) return;
 
   template = await getTemplate(template);
@@ -115,11 +94,7 @@ async function objTemplate(obj, template, roles, reverse) {
 @function filterProperties
 
 @description
-Prepares a template for merging by applying role-based property overrides and filtering properties based on include/exclude lists.
-
-The method checks whether the template object has an array property include_props and will iterate through the string entries in the array to remove all other properties from the template object.
-
-Properties defined in the template object exclude_props array property will removed from the template object.
+The filterProperties method will check for include_props and exclude_props properties on the obj and template.
 
 @param {Object} obj The parent object providing include/exclude property configuration.
 @param {Object} template The template to prepare.
@@ -185,8 +160,10 @@ async function parseTemplates(obj) {
     if (key === 'templates' && Array.isArray(val)) {
       for (const template of val) {
         // Merge template from templates array into the object. The templates will be merged in the order they are defined in the array.
-        await objTemplate(obj, template);
+        console.log(template);
+        await objTemplateComposition(obj, template);
       }
+      delete obj.templates;
 
       continue;
     }
