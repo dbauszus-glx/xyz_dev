@@ -181,7 +181,6 @@ async function parseTemplates(obj) {
     }
 
     if (key === 'templates' && Array.isArray(val)) {
-
       for (const template of val) {
         // Merge template from templates array into the object. The templates will be merged in the order they are defined in the array.
         await objTemplate(obj, template);
