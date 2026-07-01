@@ -99,12 +99,10 @@ async function objTemplate(obj, template, roles, reverse) {
   template = filterProperties(obj, template);
 
   if (reverse) {
-
     // Merge obj --> template
     obj = merge(template, obj);
     parseTemplates(obj);
     return;
-
   }
 
   parseTemplates(template);
