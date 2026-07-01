@@ -155,30 +155,40 @@ function filterProperties(obj, template) {
 @function parseTemplates
 
 @description
+The parseTemplates method will recursively traverse the provided object and its nested objects to identify and process template definitions.
+
+If a template object is found, it will be added to the workspace.templates object for later use. The template property will be removed from the object after processing.
+
+If an array of templates is found, each template will be merged into the object in the order they are defined in the array.
 
 @param {Object} obj
 */
-function parseTemplates(obj) {
+async function parseTemplates(obj) {
   // Return early if object is null or empty
   if (obj === null) return;
 
   if (obj instanceof Object && !Object.keys(obj)) return;
 
   for (const [key, val] of Object.entries(obj)) {
-    // Process template objects - if found, add type and merge into workspace templates
     if (key === 'template' && val.key) {
+      // A template object provided in a template will be a query template to be merged into the workspace.templates object. The template will be assigned a _type property to identify it as a template object. Query templates are not merged into the object they are defined in but are assigned to the workspace.templates object for later use.
       val._type = 'template';
       workspace.templates[val.key] = Object.assign(
         workspace.templates[val.key] || {},
         val,
       );
+      // The template is now referenced by it's key in the workspace.templates object. The template property is no longer needed on the object.
       delete obj.template;
       continue;
     }
 
     if (key === 'templates' && Array.isArray(val)) {
-      // TODO: merge templates into workspace.templates
-      console.log(val);
+
+      for (const template of val) {
+        // Merge template from templates array into the object. The templates will be merged in the order they are defined in the array.
+        await objTemplate(obj, template);
+      }
+
       continue;
     }
 
