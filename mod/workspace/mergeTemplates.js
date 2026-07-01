@@ -127,6 +127,8 @@ Properties defined in the template object exclude_props array property will remo
 @returns {Object} The prepared template with role overrides applied and properties filtered.
 */
 function filterProperties(obj, template) {
+
+  // TODO: should the props carried into nested templates? undefined include_props/exclude_props should not be assigned to the template object.
   template.exclude_props = obj.exclude_props ?? template.exclude_props;
   template.include_props = obj.include_props ?? template.include_props;
 
