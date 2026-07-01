@@ -28,7 +28,7 @@ export default async function mergeTemplates(obj, roles) {
   // Cache workspace in module scope for template assignment.
   workspace = await workspaceCache();
 
-  await objTemplateComposition(obj, obj.template, roles, true);
+  obj = await objTemplateComposition(obj, obj.template, roles, true);
 
   // This would only happen if the user does not have access to the object after it has been merged into the template [prototype].
   if (obj instanceof Error) return obj;
@@ -36,7 +36,7 @@ export default async function mergeTemplates(obj, roles) {
   // TODO the templates should be assigned after the template not if else
   if (Array.isArray(obj.templates)) {
     for (const template of obj.templates) {
-      await objTemplateComposition(obj, template, roles);
+      obj = await objTemplateComposition(obj, template, roles);
     }
   }
   // // Substitute ${SRC_*} in object string.
@@ -52,7 +52,7 @@ export default async function mergeTemplates(obj, roles) {
 }
 
 /**
-@function objTemplate
+@function objTemplateComposition
 @async
 
 @description
@@ -78,16 +78,18 @@ async function objTemplateComposition(obj, template, roles, reverse) {
   template = filterProperties(obj, template);
 
   if (reverse) {
+    delete obj.template;
     // Merge obj --> template
     obj = merge(template, obj);
-    parseTemplates(obj);
-    return;
+    await parseTemplates(obj);
+    return obj;
   }
 
-  parseTemplates(template);
+  await parseTemplates(template);
 
   // Merge template --> obj
   obj = merge(obj, template);
+  return obj;
 }
 
 /**
@@ -176,7 +178,7 @@ async function parseTemplates(obj) {
 
     // Recursively process nested objects
     if (val instanceof Object) {
-      parseTemplates(val);
+      await parseTemplates(val);
     }
   }
 }
