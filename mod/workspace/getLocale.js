@@ -75,9 +75,9 @@ export default async function getLocale(params, parentLocale) {
   if (!localeKey || localeKey === 'locale') {
     // The workspace.locale must not be modified.
     locale = structuredClone(workspace.locale);
-  } else if (Object.hasOwn(workspace.locales, key)) {
+  } else if (Object.hasOwn(workspace.locales, localeKey)) {
     // Workspace locales must not be modified.
-    locale = structuredClone(workspace.locales[key]);
+    locale = structuredClone(workspace.locales[localeKey]);
   } else {
     // getTemplate returns a structuredClone.
     locale = await getTemplate(key);
