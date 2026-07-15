@@ -2,23 +2,21 @@
 ## /workspace/getTemplate
 The module exports the getTemplate method which is required by the query, languageTemplates, getLayer, and getLocale modules.
 
-@requires /provider/getFrom
 @requires /workspace/cache
-@requires /utils/processEnv
+@requires /workspace/srcMap
 
 @module /workspace/getTemplate
 */
 
-import getFrom from '../provider/getFrom.js';
 import envReplace from '../utils/envReplace.js';
 import workspaceCache from './cache.js';
+import { getSource } from './srcMap.js';
 
 /**
 @global
 @typedef {Object} template A template is an object property of the workspace.templates
 @property {Object} _type The _type property distinguish the origin of a template. 'core' templates are added from the /mod/workspace/templates directory. A 'custom' is added from a custom_template JSON file defined in the xyzEnv. A 'workspace' is added from the workspace itself.
-@property {String} src The source is a location from which a template object is loaded when required. Once loaded the template will be cached.
-@property {Object} cached The cached template.
+@property {String} src The source is a location from which a template object is loaded when required.
 @property {String} template The string representation of a template, eg. html, sql.
 @property {Function} render A method which resolves in a template string.
 @property {Boolean} module The template is a module.
@@ -35,17 +33,16 @@ The template parameter provided as a string from user input must be validated to
 
 A lookup for the template object in the cached workspace.templates{} will be performed.
 
-The template will be returned without a src property.
+Templates without a src property will be returned immediately.
 
-Otherwise a lookup will be performed to check whether a template with a src property has been cached with the src as key in the workspace.templates{}.
+The template src response is retrieved from the workspace source map. The first
+request stores its provider promise before awaiting so concurrent requests share
+one fetch.
 
-An error will be returned if the getFrom method is unknown or unable to fetch from the template.src
+A module template will be created from the cached source response with the template.module flag.
 
-A module template will be created from the response with the template.module flag.
-
-In order to cache templates the fetched response object will be assigned to the template object in the workspace.templates.
-
-The src property will be removed unless from a file origin where access is immediate.
+The source response will be composed into a clone of the template definition.
+Template definitions in workspace.templates remain unchanged.
 
 A structured clone of the template will be returned to prevent the cached object being modified by role merges.
 
@@ -75,8 +72,10 @@ export default async function getTemplate(template) {
       return new Error(`Template: ${template} not found.`);
     }
 
-    template = workspace.templates[template];
+    template = { ...workspace.templates[template] };
     template.key = templateKey;
+  } else {
+    template = { ...template };
   }
 
   if (!template.src) {
@@ -85,21 +84,14 @@ export default async function getTemplate(template) {
 
   template.src = envReplace(template.src);
 
-  const method = template.src.split(':')[0];
-
-  if (!Object.hasOwn(getFrom, method)) {
-    // Unable to determine getFrom method.
-    return new Error(`Unknown getFrom method: ${template.src}`);
-  }
-
-  const response = await getFrom[method](template.src);
+  const response = await getSource(workspace, template.src);
 
   if (response instanceof Error) {
     return new Error(`Unable to getFrom src: ${template.src}`);
   }
 
   if (template.module) {
-    // Module templates must not be cached.
+    // Module render functions are created from the cached source string.
     return await moduleTemplate(template, response);
   }
 

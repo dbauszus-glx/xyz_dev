@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import getFrom from '../../../mod/provider/getFrom.js';
 import checkWorkspaceCache from '../../../mod/workspace/cache.js';
 
 //Assigning console.error to a property to restore original function with.
@@ -75,7 +76,7 @@ describe('getTemplate', async () => {
     expect(foo).toEqual('I am a module query fam');
   });
 
-  it('template with src cache', async () => {
+  it('templates sharing a src remain isolated', async () => {
     // const { default: getTemplate } = await import(
     //   '../../../mod/workspace/getTemplate.js'
     // );
@@ -99,5 +100,28 @@ describe('getTemplate', async () => {
 
     expect(barResult.bar).toBeTruthy();
     expect(barResult.foo).toBeFalsy();
+  });
+
+  it('shares one source promise between concurrent templates', async () => {
+    const src = 'file:./tests/assets/concurrent-template.json';
+    const originalFile = getFrom.file;
+
+    getFrom.file = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return { format: 'geojson' };
+    });
+
+    try {
+      const [foo, bar] = await Promise.all([
+        getTemplate({ foo: true, src }),
+        getTemplate({ bar: true, src }),
+      ]);
+
+      expect(foo).toMatchObject({ foo: true, format: 'geojson' });
+      expect(bar).toMatchObject({ bar: true, format: 'geojson' });
+      expect(getFrom.file).toHaveBeenCalledTimes(1);
+    } finally {
+      getFrom.file = originalFile;
+    }
   });
 });

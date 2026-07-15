@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -20,20 +20,32 @@ if (!globalThis.xyzEnv.WORKSPACE) {
   throw new Error('WORKSPACE must be provided by env or --workspace.');
 }
 
-const { cacheWorkspaceTemplates } = await import(
-  '../mod/workspace/_workspace.js'
-);
+const [{ default: workspaceCache }, { default: cacheRemoteSources }] =
+  await Promise.all([
+    import('../mod/workspace/cache.js'),
+    import('../mod/workspace/cacheRemoteSources.js'),
+  ]);
 
-const workspace = await cacheWorkspaceTemplates();
+const workspace = await workspaceCache(true);
 
 if (workspace instanceof Error) {
   throw workspace;
 }
 
 const output = resolve(args.output || './workspace.generated.json');
+const assets = resolve(
+  args.assets ||
+    join(dirname(output), `${basename(output, extname(output))}.assets`),
+);
+
+const cachedWorkspace = await cacheRemoteSources(workspace, assets);
+
+if (cachedWorkspace instanceof Error) {
+  throw cachedWorkspace;
+}
 
 await mkdir(dirname(output), { recursive: true });
-await writeFile(output, `${JSON.stringify(workspace, null, 2)}\n`);
+await writeFile(output, `${JSON.stringify(cachedWorkspace, null, 2)}\n`);
 
 console.log(`Generated workspace: ${output}`);
 
@@ -70,6 +82,16 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === '--assets') {
+      args.assets = argv[++i];
+      continue;
+    }
+
+    if (arg.startsWith('--assets=')) {
+      args.assets = arg.slice('--assets='.length);
+      continue;
+    }
+
     throw new Error(`Unknown argument: ${arg}`);
   }
 
@@ -82,6 +104,7 @@ function printHelp() {
 Options:
   --workspace=<ref>  Workspace source ref. Defaults to WORKSPACE env.
   --output=<path>    Output JSON path. Defaults to workspace.generated.json.
+  --assets=<path>    Static source directory. Defaults beside the output file.
   --help             Show this help.
 
 Examples:

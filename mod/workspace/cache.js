@@ -14,6 +14,7 @@ Default templates can be overwritten in the workspace or by providing a CUSTOM_T
 import getFrom from '../provider/getFrom.js';
 import logger from '../utils/logger.js';
 import merge from '../utils/merge.js';
+import { cacheWorkspaceSources } from './srcMap.js';
 
 let cache = null;
 let timestamp = Infinity;
@@ -26,7 +27,10 @@ The method checks whether the module scope variable cache has been populated.
 
 The timestamp set by cacheWorkspace is checked against the current time. The [workspace] cache will be invalidated if the difference exceeds the WORKSPACE_AGE xyzEnvironment variable.
 
-Setting the WORKSPACE_AGE to 0 is not recommended as this could cause the cache to be flushed while a request is passed through the XYZ API. A layer query processed by the [Query API module]{@link module:/query~layerQuery} will request the layer and associated locale which could be defined in remote templates. Each request to the [Workspace API getTemplate]{@link module:/workspace/getTemplate~getTemplate} method for the locale, layer, and query templates will call the checkWorkspaceCache method which will cause the workspace to be flushed and templates previously cached from their src no longer available.
+Setting the WORKSPACE_AGE to 0 is not recommended because each workspace cache
+owns the source promise map used by its templates. Constantly replacing the
+workspace also replaces this map and prevents source responses from being reused
+between requests.
 
 The cacheWorkspace method is called if the cache is invalid.
 
@@ -168,6 +172,10 @@ async function cacheWorkspace() {
   timestamp = Date.now();
 
   cache = workspace;
+
+  cacheWorkspaceSources(cache).then((result) => {
+    if (result instanceof Error) console.error(result);
+  });
 
   return workspace;
 }
