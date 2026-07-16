@@ -159,16 +159,13 @@ The nestedLocales method will be returned if a locale property is provided in th
 */
 async function locales(req, res) {
   if (req.params.locale) {
-    getNestedLocales(req, res);
+    await getNestedLocales(req, res);
     return;
   }
 
   const locales = [];
 
   for (const localeKey of Object.keys(workspace.locales)) {
-    // Nested locales should not be parsed unless specifically requested.
-    if (localeKey.split(',').length > 1) continue;
-
     const locale = await getLocale({
       user: req.params.user,
       locale: localeKey,
@@ -273,21 +270,15 @@ async function scopes(req, res) {
 
   const cachedWorkspace = await workspaceCache(true);
 
-  // TODO why is this structuredClone of the locales required?
-  const locales = structuredClone(cachedWorkspace.locales);
-
-  for (const localeKey of Object.keys(locales)) {
+  // TODO test workspace without locales property. Should the scopes method still return the scopes of the templates in the workspace.templates object?
+  for (const localeKey of Object.keys(cachedWorkspace.locales)) {
     const locale = await getLocale({
       locale: localeKey,
+      layers: true,
       user: { roles: true },
     });
-    await nestedLocales(locale, [], { roles: true });
+    await nestedLocales(locale, { roles: true });
   }
-
-  // TODO iterate through all nested locales
-  //   for (const nestedLocale of locale.locales) {
-  //   await loadLocale(locales, [localeKey, nestedLocale].join(','), user);
-  // }
 
   const scopesStringsSet = new Set();
 
@@ -321,20 +312,32 @@ async function scopes(req, res) {
   res.send(scopesArray);
 }
 
-async function nestedLocales(locale, locales = [], user) {
+/**
+@function nestedLocales
+@async
+
+@description
+The nestedLocales method iterates the locale.locales array property and requests each nested locale from the getLocale method.
+
+The nestedLocales method is called recursively to check for further nested locales.
+
+@param {Object} locale The locale object.
+@param {Object} user The user requesting the nested locales.
+@property {Array} [locale.locales] An array of nested locale keys.
+*/
+async function nestedLocales(locale, user) {
   if (!Array.isArray(locale.locales)) return;
 
+  const keys = locale.keys ?? [locale.key];
   for (const localeKey of locale.locales) {
-    const keys = locale.keys ?? [locale.key];
-    keys.push(localeKey);
+    // TODO it should be possible to provide the locale as parentLocale to avoid re-composing the parent locale for each nested locale. This would require a change to the getLocale method to accept a parentLocale parameter.
     const nestedLocale = await getLocale({
-      locale: keys,
+      locale: [...keys, localeKey],
+      layers: true,
       user,
     });
 
-    locales.push(nestedLocale);
-
-    await nestedLocales(nestedLocale, locales, user);
+    await nestedLocales(nestedLocale, user);
   }
 }
 

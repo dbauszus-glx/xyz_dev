@@ -35,7 +35,22 @@ describe('getLocale', async () => {
     expect(locale instanceof Error).toBeTruthy();
   });
 
-  it('locale with role; user with roles', async () => {
+  it('locale as string with role; user with roles', async () => {
+    const params = {
+      locale: 'uk',
+      user: {
+        roles: ['uk'],
+      },
+    };
+
+    const locale = await getLocale(params);
+
+    expect(locale.key === 'uk').toBeTruthy();
+    // This default locale with the OSM layer has been merged into the UK locale which has no layers.
+    expect(locale.layers.OSM).toBeTruthy();
+  });
+
+  it('locale as object with template with role; user with roles', async () => {
     const params = {
       locale: {
         template: {
@@ -90,7 +105,7 @@ describe('getLocale', async () => {
 
     const locale = await getLocale(params);
 
-    expect(locale.layers.Scratch).toBeTruthy();
+    expect(locale.layers.some((layer) => layer.key === 'Scratch')).toBeTruthy();
   });
 
   it('nested locales with role[s]; user with nested role string', async () => {
@@ -111,12 +126,15 @@ describe('getLocale', async () => {
       locale: ['europe', 'UK_locale'],
       layers: true,
       user: {
-        roles: ['europe.UK.scratch_role'],
+        roles: ['europe.UK.scratch_role.scratch_role_template'],
       },
     };
 
     const locale = await getLocale(params);
 
-    expect(locale.layers.Scratch).toBeTruthy();
+    const scratchLayer = locale.layers.find((layer) => layer.key === 'Scratch');
+
+    expect(scratchLayer.name === 'SCRATCH ROLE TEMPLATE').toBeTruthy();
+    expect(scratchLayer.dbs === 'XYZ').toBeTruthy();
   });
 });

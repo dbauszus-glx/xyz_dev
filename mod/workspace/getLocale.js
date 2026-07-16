@@ -58,12 +58,17 @@ export default async function getLocale(params, parentLocale) {
 
   if (localeKey === 'locale') {
     locale = structuredClone(workspace.locale);
+    locale.key ??= localeKey;
   } else if (Object.hasOwn(workspace.locales, localeKey)) {
     locale = structuredClone(workspace.locales[localeKey]);
-  } else if (typeof localeKey === 'object') {
-    locale = structuredClone(localeKey);
+    locale.key ??= localeKey;
   } else if (typeof localeKey === 'string') {
     locale = await getTemplate(localeKey);
+    locale.key ??= localeKey;
+  }
+
+  if (typeof localeKey === 'object') {
+    locale = structuredClone(localeKey);
   }
 
   // Failed to getTemplate localeKey.
@@ -71,9 +76,15 @@ export default async function getLocale(params, parentLocale) {
     return locale;
   }
 
-  locale.parentRoles ??= [];
-  if (parentLocale?.role) {
-    locale.parentRoles.push(parentLocale.role);
+  // Merge the default workspace locale
+  if (!parentLocale && locale.key !== 'locale') {
+    locale = merge(structuredClone(workspace.locale), locale);
+  }
+
+  if (parentLocale) {
+    locale.parentRoles = parentLocale.parentRoles.length
+      ? parentLocale.parentRoles
+      : [parentLocale.role];
   }
 
   locale = await composeObj(locale, params.user?.roles);
@@ -119,10 +130,10 @@ function mergeParentLocale(locale, parentLocale) {
 
   // Only locales of a nested locales should be used for further nesting.
   delete parentClone.locales;
+  delete parentClone.parentRoles;
 
   parentClone.keys ??= [parentClone.key];
   parentClone.keys.push(locale.key);
-
   parentClone.name ??= parentClone.key;
 
   // Compose the nested locale name.
@@ -142,7 +153,11 @@ async function localeLayers(locale, params) {
     return;
   }
 
-  const layers = {};
+  if (!locale.layers) {
+    return;
+  }
+
+  const layers = [];
 
   for (const layerKey of Object.keys(locale.layers)) {
     const layer = await getLayer({ ...params, layer: layerKey }, locale);
@@ -151,8 +166,9 @@ async function localeLayers(locale, params) {
       continue;
     }
 
-    layers[layerKey] = layer;
+    layers.push(layer);
   }
 
+  // Locale layers should be returned as an array.
   locale.layers = layers;
 }

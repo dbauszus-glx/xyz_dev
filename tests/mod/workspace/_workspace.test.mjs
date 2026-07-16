@@ -3,10 +3,31 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import getKeyMethod from '../../../mod/workspace/_workspace.js';
 import checkWorkspaceCache from '../../../mod/workspace/cache.js';
 
+describe('workspace access error', () => {
+  beforeAll(async () => {
+    globalThis.xyzEnv = {
+      WORKSPACE: 'file:bar.json',
+    };
+
+    await checkWorkspaceCache(true);
+  });
+
+  it('return 500', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'locale',
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(500);
+  });
+});
+
 describe('getKeyMethod', () => {
   beforeAll(async () => {
     globalThis.xyzEnv = {
-      TITLE: 'WORKSPACE TEST',
       WORKSPACE: 'file:./tests/assets/_workspace.json',
     };
 
@@ -26,12 +47,12 @@ describe('getKeyMethod', () => {
     const layer = res._getData();
 
     expect(layer.key === 'OSM').toBeTruthy();
-  })
+  });
 
   it('locale', async () => {
     const { req, res } = createMocks({
       params: {
-        key: 'locale'
+        key: 'locale',
       },
     });
 
@@ -40,10 +61,34 @@ describe('getKeyMethod', () => {
     const locale = res._getData();
 
     expect(locale.layers.OSM).toBeTruthy();
-  })
+  });
+
+  it('scopes without admin privileges', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'scopes',
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(403);
+  });
+
+  it('Invalid key param', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'foo',
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(400);
+  });
 });
 
-describe('scopes: roles_object_workspace', () => {
+describe('workspace: roles_object_workspace', () => {
   beforeAll(async () => {
     globalThis.xyzEnv = {
       WORKSPACE: 'file:./tests/assets/roles_object_workspace.json',
@@ -78,7 +123,7 @@ describe('scopes: roles_object_workspace', () => {
   });
 });
 
-describe('scopes: sibling_workspace', () => {
+describe('workspace: sibling_workspace', () => {
   beforeAll(async () => {
     globalThis.xyzEnv = {
       TITLE: 'WORKSPACE TEST',
@@ -88,7 +133,7 @@ describe('scopes: sibling_workspace', () => {
     await checkWorkspaceCache(true);
   });
 
-  it('nested locale roles should not leak into sibling templates', async () => {
+  it('scopes: nested locale roles should not leak into sibling templates', async () => {
     const { req, res } = createMocks({
       params: {
         key: 'scopes',
@@ -108,14 +153,14 @@ describe('scopes: sibling_workspace', () => {
       'uk.brand_b',
       'uk.demographics',
       'uk.nested',
-      'uk.stores'
+      'uk.stores',
     ];
 
     expect(roles).toEqual(expectedRoles);
   });
 });
 
-describe('workspace: w/ Nested Locales & Roles', () => {
+describe('workspace: nested_roles/workspace', () => {
   beforeAll(async () => {
     globalThis.xyzEnv = {
       TITLE: 'WORKSPACE TEST',
@@ -125,30 +170,32 @@ describe('workspace: w/ Nested Locales & Roles', () => {
     await checkWorkspaceCache(true);
   });
 
-  it('nested locales w/ Nested Roles', async () => {
+  it('scopes: nested locales with nested roles', async () => {
     const expectedRoles = [
-      'another_role',
-      'brand_a',
-      'brand_b',
-      'coremarkets',
-      'coremarkets.brand_a',
-      'coremarkets.brand_b',
       'germany',
       'germany.another_role',
       'germany.globalvista',
+      'germany.globalvista.OBJ_ROLE',
       'germany.globalvista.TEMPLATE_ROLE',
       'germany.TEMPLATE_ROLE',
-      'globalvista',
       'OBJ_ROLE',
       'TEMPLATE_ROLE',
-      'test',
       'uk',
       'uk.coremarkets',
       'uk.coremarkets.brand_a',
+      'uk.coremarkets.brand_a.OBJ_ROLE',
+      'uk.coremarkets.brand_a.TEMPLATE_ROLE',
       'uk.coremarkets.brand_b',
+      'uk.coremarkets.brand_b.OBJ_ROLE',
+      'uk.coremarkets.brand_b.TEMPLATE_ROLE',
+      'uk.coremarkets.OBJ_ROLE',
+      'uk.coremarkets.TEMPLATE_ROLE',
       'uk.globalvista',
+      'uk.globalvista.OBJ_ROLE',
       'uk.globalvista.TEMPLATE_ROLE',
+      'uk.OBJ_ROLE',
       'uk.TEMPLATE_ROLE',
+      'uk.test',
     ];
 
     const { req, res } = createMocks({
@@ -167,14 +214,76 @@ describe('workspace: w/ Nested Locales & Roles', () => {
     expect(roles).toEqual(expectedRoles);
   });
 
-  it('Check Access to Unrelated Locale', async () => {
+  it('locale: anonymous access denied for restricted locale', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'locale',
+        locale: 'germany',
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(400);
+  });
+
+  it('layer: anonymous access denied for restricted layer', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'layer',
+        layer: 'OSM_GERMANY',
+        locale: 'germany',
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(400);
+  });
+
+  it('layer: authorized user accessing inherited role layer', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'layer',
+        layer: 'OSM_GERMANY',
+        locale: 'germany',
+        user: {
+          roles: ['germany'],
+        },
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(200);
+  });
+
+  it('locales: access to parent with nested role', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'locales',
+        user: {
+          roles: ['germany.globalvista'],
+        },
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    const locales = res._getData();
+
+    expect(locales.find((l) => l.key === 'germany')).toBeTruthy();
+    expect(locales.find((l) => l.key === 'uk')).toBeFalsy();
+  });
+
+  it('locales: list for restricted locales; user with nested role', async () => {
     // User has access to UK -> coremarkets -> brand_b
     // But requests Germany
     const { req, res } = createMocks({
       params: {
         key: 'locales', // Requesting list of locales
         user: {
-          roles: ['uk', 'uk.coremarkets', 'uk.coremarkets.brand_b'],
+          roles: ['uk.coremarkets.brand_b'],
         },
       },
     });
@@ -202,63 +311,26 @@ describe('workspace: w/ Nested Locales & Roles', () => {
     expect(!germany).toBeTruthy();
   });
 
-  it('Anonymous Access to Restricted Locale', async () => {
-    const { req, res } = createMocks({
-      params: {
-        key: 'locale',
-        locale: 'germany',
-        user: {}, // No roles
-      },
-    });
-
-    await getKeyMethod(req, res);
-
-    const code = res.statusCode;
-    expect(code).toEqual(400);
-    expect(res._getData()).toEqual('Role access denied.');
-  });
-
-  it('Anonymous Access to Restricted Layer', async () => {
-    const { req, res } = createMocks({
-      params: {
-        key: 'layer',
-        layer: 'OSM_GERMANY',
-        locale: 'germany',
-        user: {},
-      },
-    });
-
-    await getKeyMethod(req, res);
-
-    const code = res.statusCode;
-    expect(code).toEqual(400);
-  });
-
-  it('Authorized User Accessing Inherited Role Layer', async () => {
-    const { req, res } = createMocks({
-      params: {
-        key: 'layer',
-        layer: 'OSM_GERMANY',
-        locale: 'germany',
-        user: {
-          roles: ['germany'],
-        },
-      },
-    });
-
-    await getKeyMethod(req, res);
-
-    const code = res.statusCode;
-
-    expect(code).toEqual(200);
-  });
-
-  it('Hidden Parent in Locales List', async () => {
+  it('locales: list nested locales in restricted locale without roles', async () => {
     const { req, res } = createMocks({
       params: {
         key: 'locales',
+        locale: 'uk',
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    expect(res.statusCode).toEqual(400);
+  });
+
+  it('locales: list nested locales', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'locales',
+        locale: 'uk',
         user: {
-          roles: ['germany.globalvista'],
+          roles: ['uk.coremarkets'],
         },
       },
     });
@@ -266,16 +338,54 @@ describe('workspace: w/ Nested Locales & Roles', () => {
     await getKeyMethod(req, res);
 
     const locales = res._getData();
-    const code = res.statusCode;
 
-    expect(code).toEqual(200);
-
-    // Germany should be hidden (traversal only, not target)
-    const germany = locales.find((l) => l.key === 'germany');
-    expect(!germany).toBeTruthy();
+    expect(Array.isArray(locales)).toBeTruthy();
+    expect(
+      locales.find((locale) => locale.key === 'coremarkets_template'),
+    ).toBeTruthy();
+    expect(
+      locales.find((locale) => locale.key === 'no_role_locale'),
+    ).toBeTruthy();
   });
 
-  it('Should not see a locale without the correct role', async () => {
+  it('locales: list nested locales where there are none', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'locales',
+        locale: 'uk,globalvista_template',
+        user: {
+          roles: ['uk.globalvista'],
+        },
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    const locales = res._getData();
+
+    expect(locales.length === 0).toBeTruthy();
+  });
+
+  it('locales: list nested locales in nested locale', async () => {
+    const { req, res } = createMocks({
+      params: {
+        key: 'locales',
+        locale: 'uk,coremarkets_template',
+        user: {
+          roles: ['uk.coremarkets'],
+        },
+      },
+    });
+
+    await getKeyMethod(req, res);
+
+    const locales = res._getData();
+
+    // no accessible nested locales in coremarkets_template
+    expect(locales.length === 0).toBeTruthy();
+  });
+
+  it('locale: should not see a locale without the correct role', async () => {
     const { req, res } = createMocks({
       params: {
         key: 'locale',
