@@ -25,6 +25,7 @@ The workspace object defines the mapp resources available in an XYZ instance.
 import { createHash } from 'node:crypto';
 import logger from '../utils/logger.js';
 import workspaceCache from './cache.js';
+import generateScopes from './generateScopes.js';
 import getLayer from './getLayer.js';
 import getLocale from './getLocale.js';
 
@@ -37,6 +38,11 @@ const keyMethods = {
 };
 
 let workspace;
+
+// Scope generation composes every locale, layer, and nested template. Cache the
+// resulting promise by workspace identity so concurrent requests share the same
+// traversal and a refreshed workspace invalidates the result automatically.
+const workspaceScopes = new WeakMap();
 
 /**
 @function getKeyMethod
@@ -268,28 +274,24 @@ async function scopes(req, res) {
     return;
   }
 
-  const cachedWorkspace = await workspaceCache(true);
+  const cachedWorkspace = await workspaceCache();
 
-  // TODO test workspace without locales property. Should the scopes method still return the scopes of the templates in the workspace.templates object?
-  for (const localeKey of Object.keys(cachedWorkspace.locales)) {
-    const locale = await getLocale({
-      locale: localeKey,
-      layers: true,
-      user: { roles: true },
-    });
-    await nestedLocales(locale, { roles: true });
+  if (Array.isArray(cachedWorkspace.cachedScopes)) {
+    res.send([...cachedWorkspace.cachedScopes]);
+    return;
   }
 
-  const scopesStringsSet = new Set();
+  let scopesPromise = workspaceScopes.get(cachedWorkspace);
 
-  cachedWorkspace.scopes.forEach((scope) => {
-    if (!Array.isArray(scope)) return;
-    scopesStringsSet.add(scope.filter(Boolean).join('.'));
-  });
+  if (!scopesPromise) {
+    scopesPromise = generateScopes(cachedWorkspace);
+    workspaceScopes.set(cachedWorkspace, scopesPromise);
 
-  const scopesArray = Array.from(scopesStringsSet)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+    // Do not retain a rejected promise for the lifetime of the workspace.
+    scopesPromise.catch(() => workspaceScopes.delete(cachedWorkspace));
+  }
+
+  const scopesArray = await scopesPromise;
 
   //TODO: Should the scopesArray be filtered for user roles? If so, how should that be implemented?
   //   for (const role of rolesSet) {
@@ -309,36 +311,7 @@ async function scopes(req, res) {
   //     }
   //   }
 
-  res.send(scopesArray);
-}
-
-/**
-@function nestedLocales
-@async
-
-@description
-The nestedLocales method iterates the locale.locales array property and requests each nested locale from the getLocale method.
-
-The nestedLocales method is called recursively to check for further nested locales.
-
-@param {Object} locale The locale object.
-@param {Object} user The user requesting the nested locales.
-@property {Array} [locale.locales] An array of nested locale keys.
-*/
-async function nestedLocales(locale, user) {
-  if (!Array.isArray(locale.locales)) return;
-
-  const keys = locale.keys ?? [locale.key];
-  for (const localeKey of locale.locales) {
-    // TODO it should be possible to provide the locale as parentLocale to avoid re-composing the parent locale for each nested locale. This would require a change to the getLocale method to accept a parentLocale parameter.
-    const nestedLocale = await getLocale({
-      locale: [...keys, localeKey],
-      layers: true,
-      user,
-    });
-
-    await nestedLocales(nestedLocale, user);
-  }
+  res.send([...scopesArray]);
 }
 
 /**

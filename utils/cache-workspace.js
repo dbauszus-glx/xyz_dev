@@ -20,11 +20,15 @@ if (!globalThis.xyzEnv.WORKSPACE) {
   throw new Error('WORKSPACE must be provided by env or --workspace.');
 }
 
-const [{ default: workspaceCache }, { default: cacheRemoteSources }] =
-  await Promise.all([
-    import('../mod/workspace/cache.js'),
-    import('../mod/workspace/cacheRemoteSources.js'),
-  ]);
+const [
+  { default: workspaceCache },
+  { default: cacheRemoteSources },
+  { default: generateScopes },
+] = await Promise.all([
+  import('../mod/workspace/cache.js'),
+  import('../mod/workspace/cacheRemoteSources.js'),
+  import('../mod/workspace/generateScopes.js'),
+]);
 
 const workspace = await workspaceCache(true);
 
@@ -44,10 +48,17 @@ if (cachedWorkspace instanceof Error) {
   throw cachedWorkspace;
 }
 
+cachedWorkspace.cachedScopes = await generateScopes(cachedWorkspace);
+
+// Runtime scope collection uses a Set, which cannot be represented in JSON.
+delete cachedWorkspace.scopes;
+
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, `${JSON.stringify(cachedWorkspace, null, 2)}\n`);
 
-console.log(`Generated workspace: ${output}`);
+console.log(
+  `Generated workspace with ${cachedWorkspace.cachedScopes.length} cached scopes: ${output}`,
+);
 
 function parseArgs(argv) {
   const args = {};
