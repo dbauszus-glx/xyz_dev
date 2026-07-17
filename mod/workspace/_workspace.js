@@ -34,6 +34,7 @@ const keyMethods = {
   locale,
   locales,
   scopes,
+  roles: scopes, // for backwards compatibility with the workspace/roles endpoint
   test,
 };
 
@@ -60,13 +61,6 @@ The method checks whether the req.params.key matches a keyMethods property and r
 */
 export default async function getKeyMethod(req, res) {
   workspace = await workspaceCache();
-
-  if (workspace instanceof Error) {
-    return res
-      .status(500)
-      .setHeader('Content-Type', 'text/plain')
-      .send('Failed to load workspace.');
-  }
 
   // The keys object must own a user provided lookup key
   if (!Object.hasOwn(keyMethods, req.params.key)) {
@@ -293,25 +287,71 @@ async function scopes(req, res) {
 
   const scopesArray = await scopesPromise;
 
-  //TODO: Should the scopesArray be filtered for user roles? If so, how should that be implemented?
-  //   for (const role of rolesSet) {
-  //     const rolesArr = role.split('.');
+  if (req.params.tree) {
+    scopesArrayToTree(res, scopesStringsSet);
+    return;
+  }
 
-  //     if (rolesArr.length > 1) {
-  //       rolesArr.reduce(
-  //         (accumulator, currentValue) => (accumulator[currentValue] ??= {}),
-  //         rolesTree,
-  //       );
+  res.send(scopesArray);
+}
 
-  //       for (const role of rolesArr) {
-  //         rolesSet.add(role);
-  //       }
-  //     } else {
-  //       rolesTree[role] ??= {};
-  //     }
-  //   }
+/**
+@function scopesArrayToTree
 
-  res.send([...scopesArray]);
+@description
+The scopesArrayToTree method converts an array of scopes strings into a tree structure.
+
+@param {res} res HTTP response.
+@param {Set} scopesStringsSet Set of scopes strings.
+*/
+function scopesArrayToTree(res, scopesStringsSet) {
+  const scopesTree = {};
+
+  for (const scope of scopesStringsSet) {
+    if (scope === '') continue;
+
+    const rolesArr = scope.split('.');
+
+    if (rolesArr.length > 1) {
+      rolesArr.reduce(
+        (accumulator, currentValue) => (accumulator[currentValue] ??= {}),
+        scopesTree,
+      );
+    } else {
+      scopesTree[scope] ??= {};
+    }
+  }
+
+  res.send(scopesTree);
+}
+
+/**
+@function nestedLocales
+@async
+
+@description
+The nestedLocales method iterates the locale.locales array property and requests each nested locale from the getLocale method.
+
+The nestedLocales method is called recursively to check for further nested locales.
+
+@param {Object} locale The locale object.
+@param {Object} user The user requesting the nested locales.
+@property {Array} [locale.locales] An array of nested locale keys.
+*/
+async function nestedLocales(locale, user) {
+  if (!Array.isArray(locale.locales)) return;
+
+  const keys = locale.keys ?? [locale.key];
+  for (const localeKey of locale.locales) {
+    // TODO it should be possible to provide the locale as parentLocale to avoid re-composing the parent locale for each nested locale. This would require a change to the getLocale method to accept a parentLocale parameter.
+    const nestedLocale = await getLocale({
+      locale: [...keys, localeKey],
+      layers: true,
+      user,
+    });
+
+    await nestedLocales(nestedLocale, user);
+  }
 }
 
 /**
