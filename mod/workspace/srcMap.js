@@ -19,14 +19,12 @@ export const srcMap = new Map();
 @function getSource
 @async
 @description
-TODO
+Resolves a src reference to its source response. Errors are returned rather than thrown. Object responses are cloned to prevent modification of the cached response.
 
 @param {String} src Source reference.
 @returns {Promise<String|Object|Error>} Cloned source response.
 */
 export async function getSource(src) {
-  src = envReplace(src);
-
   const response = await getSourcePromise(src);
 
   if (response instanceof Error) {
@@ -95,6 +93,8 @@ export async function cacheWorkspaceSources(workspace) {
 @description
 Retrieves the source promise for the given src. If the source promise does not exist, it is created using the appropriate method from the getFrom object.
 
+Environment variables in the src are only substituted on a map miss. A src with environment variables is stored as an alias for the resolved src promise so envReplace runs once per unique src string.
+
 @param {String} src Source identifier.
 @returns {Promise<Object|Error>} Source response promise.
 */
@@ -103,15 +103,24 @@ function getSourcePromise(src) {
 
   if (responsePromise) return responsePromise;
 
-  const method = src.split(':')[0];
+  const resolvedSrc = envReplace(src);
 
-  responsePromise = Object.hasOwn(getFrom, method)
-    ? Promise.resolve()
-        .then(() => getFrom[method](src))
-        .catch((err) => err)
-    : Promise.resolve(new Error(`Unknown getFrom method: ${src}`));
+  responsePromise = srcMap.get(resolvedSrc);
 
-  srcMap.set(src, responsePromise);
+  if (!responsePromise) {
+    const method = resolvedSrc.split(':')[0];
+
+    responsePromise = Object.hasOwn(getFrom, method)
+      ? Promise.resolve()
+          .then(() => getFrom[method](resolvedSrc))
+          .catch((err) => err)
+      : Promise.resolve(new Error(`Unknown getFrom method: ${resolvedSrc}`));
+
+    srcMap.set(resolvedSrc, responsePromise);
+  }
+
+  // Alias the unresolved src so subsequent requests hit the map without envReplace.
+  if (src !== resolvedSrc) srcMap.set(src, responsePromise);
 
   return responsePromise;
 }
@@ -122,8 +131,8 @@ function getSourcePromise(src) {
 Recursively collects src properties from the value object and adds them to the sources Set. Inspected objects are tracked in the inspectedObjects WeakSet to avoid infinite recursion.
 
 @param {Object} obj
-@param {Set} sources 
-@param {WeakSet} inspectedObjects 
+@param {Set} sources
+@param {WeakSet} inspectedObjects
 @returns {void}
 */
 function collectSources(obj, sources, inspectedObjects) {
@@ -132,7 +141,7 @@ function collectSources(obj, sources, inspectedObjects) {
   inspectedObjects.add(obj);
 
   if (typeof obj.src === 'string') {
-    sources.add(envReplace(obj.src));
+    sources.add(obj.src);
   }
 
   Object.values(obj).forEach((item) =>

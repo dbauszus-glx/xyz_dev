@@ -36,6 +36,32 @@ describe('workspace srcMap', () => {
     }
   });
 
+  it('resolves environment variables once and aliases the unresolved src', async () => {
+    const originalFile = getFrom.file;
+    const originalSrcDir = xyzEnv.SRC_DIR;
+
+    xyzEnv.SRC_DIR = './resolved';
+    getFrom.file = vi.fn(async () => 'source');
+
+    try {
+      const first = await getSource('file:${DIR}/shared.json');
+      const second = await getSource('file:./resolved/shared.json');
+      const third = await getSource('file:${DIR}/shared.json');
+
+      expect(first).toBe('source');
+      expect(second).toBe('source');
+      expect(third).toBe('source');
+      expect(getFrom.file).toHaveBeenCalledTimes(1);
+      expect(getFrom.file).toHaveBeenCalledWith('file:./resolved/shared.json');
+      expect(srcMap.get('file:${DIR}/shared.json')).toBe(
+        srcMap.get('file:./resolved/shared.json'),
+      );
+    } finally {
+      getFrom.file = originalFile;
+      xyzEnv.SRC_DIR = originalSrcDir;
+    }
+  });
+
   it('discovers nested and duplicate sources', async () => {
     const workspace = {
       templates: {
