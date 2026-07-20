@@ -1,11 +1,16 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import getFrom from '../../../mod/provider/getFrom.js';
 import cacheRemoteSources from '../../../mod/workspace/cacheRemoteSources.js';
+import { srcMap } from '../../../mod/workspace/srcMap.js';
 
 const temporaryDirectories = [];
+
+beforeEach(() => {
+  srcMap.clear();
+});
 
 afterEach(async () => {
   await Promise.all(

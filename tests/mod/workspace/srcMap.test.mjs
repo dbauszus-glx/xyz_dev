@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import getFrom from '../../../mod/provider/getFrom.js';
 import {
   cacheWorkspaceSources,
   getSource,
-  getSrcMap,
+  srcMap,
 } from '../../../mod/workspace/srcMap.js';
 
 describe('workspace srcMap', () => {
+  beforeEach(() => {
+    srcMap.clear();
+  });
+
   it('shares one promise between concurrent source requests', async () => {
-    const workspace = {};
     const src = 'file:./shared.json';
     const originalFile = getFrom.file;
 
@@ -19,15 +22,15 @@ describe('workspace srcMap', () => {
 
     try {
       const [first, second] = await Promise.all([
-        getSource(workspace, src),
-        getSource(workspace, src),
+        getSource(src),
+        getSource(src),
       ]);
 
       first.nested.value = false;
 
       expect(second).toEqual({ nested: { value: true } });
       expect(getFrom.file).toHaveBeenCalledTimes(1);
-      expect(getSrcMap(workspace).get(src)).toBeInstanceOf(Promise);
+      expect(srcMap.get(src)).toBeInstanceOf(Promise);
     } finally {
       getFrom.file = originalFile;
     }
@@ -54,8 +57,8 @@ describe('workspace srcMap', () => {
       await cacheWorkspaceSources(workspace);
 
       expect(getFrom.file).toHaveBeenCalledTimes(2);
-      expect(getSrcMap(workspace).has('file:./first.json')).toBeTruthy();
-      expect(getSrcMap(workspace).has('file:./second.json')).toBeTruthy();
+      expect(srcMap.has('file:./first.json')).toBeTruthy();
+      expect(srcMap.has('file:./second.json')).toBeTruthy();
       expect(workspace).not.toHaveProperty('srcMap');
     } finally {
       getFrom.file = originalFile;

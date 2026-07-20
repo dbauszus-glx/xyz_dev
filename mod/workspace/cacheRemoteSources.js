@@ -56,7 +56,7 @@ export default async function cacheRemoteSources(workspace, directory) {
 
       const pendingSource = {
         refs,
-        responsePromise: getSource(workspace, src),
+        responsePromise: getSource(src),
         src,
       };
 

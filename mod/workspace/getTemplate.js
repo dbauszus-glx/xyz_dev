@@ -76,7 +76,7 @@ export default async function getTemplate(template) {
 
   template.src = envReplace(template.src);
 
-  const response = await getSource(workspace, template.src);
+  const response = await getSource(template.src);
 
   if (response instanceof Error) {
     return new Error(`Unable to getFrom src: ${template.src}`);

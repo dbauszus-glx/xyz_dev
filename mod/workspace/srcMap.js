@@ -10,7 +10,10 @@ requests are awaited so concurrent requests for a src share one fetch.
 import getFrom from '../provider/getFrom.js';
 import envReplace from '../utils/envReplace.js';
 
-const workspaceSrcMaps = new WeakMap();
+/**
+Module scope source promise map. The map must be cleared when the workspace cache is rebuilt.
+*/
+export const srcMap = new Map();
 
 /**
 @function getSource
@@ -18,14 +21,13 @@ const workspaceSrcMaps = new WeakMap();
 @description
 TODO
 
-@param {Object} workspace Cached workspace.
 @param {String} src Source reference.
 @returns {Promise<String|Object|Error>} Cloned source response.
 */
-export async function getSource(workspace, src) {
+export async function getSource(src) {
   src = envReplace(src);
 
-  const response = await getSourcePromise(workspace, src);
+  const response = await getSourcePromise(src);
 
   if (response instanceof Error) {
     // TODO needs test
@@ -65,10 +67,7 @@ export async function cacheWorkspaceSources(workspace) {
     breadth.forEach((src) => inspectedSrc.add(src));
 
     // Calling getSourcePromise for the whole breadth starts every new request before any response is awaited.
-    const responses = breadth.map((src) => [
-      src,
-      getSourcePromise(workspace, src),
-    ]);
+    const responses = breadth.map((src) => [src, getSourcePromise(src)]);
 
     queue = [];
 
@@ -92,35 +91,14 @@ export async function cacheWorkspaceSources(workspace) {
 }
 
 /**
-@function getSrcMap
-@description
-Retrieves the source promise map for the given workspace. If the source map does not exist, it is created and stored in the workspaceSrcMaps WeakMap.
-
-@param {Object} workspace Cached workspace.
-@returns {Map<String, Promise>} Source promise map for the workspace.
-*/
-export function getSrcMap(workspace) {
-  let srcMap = workspaceSrcMaps.get(workspace);
-
-  if (!srcMap) {
-    srcMap = new Map();
-    workspaceSrcMaps.set(workspace, srcMap);
-  }
-
-  return srcMap;
-}
-
-/**
 @function getSourcePromise
 @description
-Retrieves the source promise for the given src in the workspace. If the source promise does not exist, it is created using the appropriate method from the getFrom object.
+Retrieves the source promise for the given src. If the source promise does not exist, it is created using the appropriate method from the getFrom object.
 
-@param {Object} workspace Cached workspace.
 @param {String} src Source identifier.
 @returns {Promise<Object|Error>} Source response promise.
 */
-function getSourcePromise(workspace, src) {
-  const srcMap = getSrcMap(workspace);
+function getSourcePromise(src) {
   let responsePromise = srcMap.get(src);
 
   if (responsePromise) return responsePromise;
