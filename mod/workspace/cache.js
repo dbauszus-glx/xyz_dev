@@ -27,10 +27,7 @@ The method checks whether the module scope variable cache has been populated.
 
 The timestamp set by cacheWorkspace is checked against the current time. The [workspace] cache will be invalidated if the difference exceeds the WORKSPACE_AGE xyzEnvironment variable.
 
-Setting the WORKSPACE_AGE to 0 is not recommended because each workspace cache
-owns the source promise map used by its templates. Constantly replacing the
-workspace also replaces this map and prevents source responses from being reused
-between requests.
+Setting the WORKSPACE_AGE to 0 is not recommended because each workspace cache owns the source promise map used by its templates. Constantly replacing the workspace also replaces this map and prevents source responses from being reused between requests.
 
 The cacheWorkspace method is called if the cache is invalid.
 
@@ -156,7 +153,10 @@ async function cacheWorkspace() {
   cache = workspace;
 
   cacheWorkspaceSources(cache).then((result) => {
-    if (result instanceof Error) console.error(result);
+    if (result instanceof Error) {
+      // TODO needs test
+      console.error(result);
+    }
   });
 
   return workspace;

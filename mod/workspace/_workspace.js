@@ -40,9 +40,7 @@ const keyMethods = {
 
 let workspace;
 
-// Scope generation composes every locale, layer, and nested template. Cache the
-// resulting promise by workspace identity so concurrent requests share the same
-// traversal and a refreshed workspace invalidates the result automatically.
+// Scope generation composes every locale, layer, and nested template. Cache the resulting promise by workspace identity so concurrent requests share the same traversal and a refreshed workspace invalidates the result automatically.
 const workspaceScopes = new WeakMap();
 
 /**
@@ -288,7 +286,7 @@ async function scopes(req, res) {
   const scopesArray = await scopesPromise;
 
   if (req.params.tree) {
-    scopesArrayToTree(res, scopesStringsSet);
+    scopesArrayToTree(res, scopesArray);
     return;
   }
 
@@ -302,12 +300,12 @@ async function scopes(req, res) {
 The scopesArrayToTree method converts an array of scopes strings into a tree structure.
 
 @param {res} res HTTP response.
-@param {Set} scopesStringsSet Set of scopes strings.
+@param {Array} scopesArray Array of scopes strings.
 */
-function scopesArrayToTree(res, scopesStringsSet) {
+function scopesArrayToTree(res, scopesArray) {
   const scopesTree = {};
 
-  for (const scope of scopesStringsSet) {
+  for (const scope of scopesArray) {
     if (scope === '') continue;
 
     const rolesArr = scope.split('.');

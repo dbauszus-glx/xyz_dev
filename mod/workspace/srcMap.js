@@ -15,6 +15,8 @@ const workspaceSrcMaps = new WeakMap();
 /**
 @function getSource
 @async
+@description
+TODO
 
 @param {Object} workspace Cached workspace.
 @param {String} src Source reference.
@@ -25,8 +27,14 @@ export async function getSource(workspace, src) {
 
   const response = await getSourcePromise(workspace, src);
 
-  if (response instanceof Error) return response;
-  if (response === undefined) return new Error(`Unable to load src: ${src}`);
+  if (response instanceof Error) {
+    // TODO needs test
+    return response;
+  }
+  if (response === undefined) {
+    // TODO needs test
+    return new Error(`Unable to load src: ${src}`);
+  }
 
   return cloneSource(response);
 }
@@ -36,9 +44,7 @@ export async function getSource(workspace, src) {
 @async
 
 @description
-Discovers src properties in the workspace and in fetched responses. Every source
-promise in a breadth is inserted into the source map before responses are
-inspected, so duplicate and concurrent references share one request.
+Discovers src properties in the workspace and in fetched responses. Every source promise in a breadth is inserted into the source map before responses are inspected, so duplicate and concurrent references share one request.
 
 @param {Object} workspace Workspace to scan.
 @returns {Promise<Object|Error>} Workspace or source discovery Error.
@@ -58,8 +64,7 @@ export async function cacheWorkspaceSources(workspace) {
 
     breadth.forEach((src) => inspectedSrc.add(src));
 
-    // Calling getSourcePromise for the whole breadth starts every new request
-    // before any response is awaited.
+    // Calling getSourcePromise for the whole breadth starts every new request before any response is awaited.
     const responses = breadth.map((src) => [
       src,
       getSourcePromise(workspace, src),
@@ -88,6 +93,8 @@ export async function cacheWorkspaceSources(workspace) {
 
 /**
 @function getSrcMap
+@description
+Retrieves the source promise map for the given workspace. If the source map does not exist, it is created and stored in the workspaceSrcMaps WeakMap.
 
 @param {Object} workspace Cached workspace.
 @returns {Map<String, Promise>} Source promise map for the workspace.
@@ -103,6 +110,15 @@ export function getSrcMap(workspace) {
   return srcMap;
 }
 
+/**
+@function getSourcePromise
+@description
+Retrieves the source promise for the given src in the workspace. If the source promise does not exist, it is created using the appropriate method from the getFrom object.
+
+@param {Object} workspace Cached workspace.
+@param {String} src Source identifier.
+@returns {Promise<Object|Error>} Source response promise.
+*/
 function getSourcePromise(workspace, src) {
   const srcMap = getSrcMap(workspace);
   let responsePromise = srcMap.get(src);
@@ -122,16 +138,26 @@ function getSourcePromise(workspace, src) {
   return responsePromise;
 }
 
-function collectSources(value, sources, inspectedObjects) {
-  if (!value || typeof value !== 'object') return;
-  if (inspectedObjects.has(value)) return;
-  inspectedObjects.add(value);
+/**
+@function collectSources
+@description
+Recursively collects src properties from the value object and adds them to the sources Set. Inspected objects are tracked in the inspectedObjects WeakSet to avoid infinite recursion.
 
-  if (typeof value.src === 'string') {
-    sources.add(envReplace(value.src));
+@param {Object} obj
+@param {Set} sources 
+@param {WeakSet} inspectedObjects 
+@returns {void}
+*/
+function collectSources(obj, sources, inspectedObjects) {
+  if (!obj || typeof obj !== 'object') return;
+  if (inspectedObjects.has(obj)) return;
+  inspectedObjects.add(obj);
+
+  if (typeof obj.src === 'string') {
+    sources.add(envReplace(obj.src));
   }
 
-  Object.values(value).forEach((item) =>
+  Object.values(obj).forEach((item) =>
     collectSources(item, sources, inspectedObjects),
   );
 }
