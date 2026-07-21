@@ -28,11 +28,9 @@ export async function getSource(src) {
   const response = await getSourcePromise(src);
 
   if (response instanceof Error) {
-    // TODO needs test
     return response;
   }
   if (response === undefined) {
-    // TODO needs test
     return new Error(`Unable to load src: ${src}`);
   }
 

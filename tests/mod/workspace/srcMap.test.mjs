@@ -62,6 +62,38 @@ describe('workspace srcMap', () => {
     }
   });
 
+  it('returns the provider error response', async () => {
+    const originalFile = getFrom.file;
+
+    getFrom.file = vi.fn(async () => {
+      throw new Error('provider failed');
+    });
+
+    try {
+      const response = await getSource('file:./failing.json');
+
+      expect(response).toBeInstanceOf(Error);
+      expect(response.message).toBe('provider failed');
+    } finally {
+      getFrom.file = originalFile;
+    }
+  });
+
+  it('returns an error for an undefined source response', async () => {
+    const originalFile = getFrom.file;
+
+    getFrom.file = vi.fn(async () => undefined);
+
+    try {
+      const response = await getSource('file:./undefined.json');
+
+      expect(response).toBeInstanceOf(Error);
+      expect(response.message).toBe('Unable to load src: file:./undefined.json');
+    } finally {
+      getFrom.file = originalFile;
+    }
+  });
+
   it('discovers nested and duplicate sources', async () => {
     const workspace = {
       templates: {

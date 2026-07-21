@@ -8,7 +8,6 @@ The module exports the getTemplate method which is required by the query, langua
 @module /workspace/getTemplate
 */
 
-import envReplace from '../utils/envReplace.js';
 import workspaceCache from './cache.js';
 import { getSource } from './srcMap.js';
 
@@ -74,12 +73,11 @@ export default async function getTemplate(template) {
     return { ...template };
   }
 
-  template.src = envReplace(template.src);
-
   const response = await getSource(template.src);
 
+  // The error response is created by the getSource method.
   if (response instanceof Error) {
-    return new Error(`Unable to getFrom src: ${template.src}`);
+    return response;
   }
 
   if (template.module) {
