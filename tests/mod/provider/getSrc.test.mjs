@@ -1,8 +1,5 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAgent = new MockAgent();
 setGlobalDispatcher(mockAgent);
@@ -25,20 +22,10 @@ vi.mock('../../../mod/provider/cloudfront.js', () => ({
 
 const { default: getSrc } = await import('../../../mod/provider/getSrc.js');
 
-const temporaryDirectories = [];
-
 beforeEach(async () => {
   await getSrc({ clear: true });
   mockFileFn.mockReset();
   mockCloudFrontFn.mockReset();
-});
-
-afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { force: true, recursive: true })),
-  );
 });
 
 describe('getSrc: providers', () => {
@@ -227,6 +214,44 @@ describe('getSrc: cache workspace sources', () => {
     expect(workspace.templates.first.src).toBe('file:./first.json');
   });
 
+  it('does not read the source of srcLoaded objects', async () => {
+    const workspace = {
+      templates: {
+        loaded: {
+          src: 'file:./loaded.json',
+          srcLoaded: true,
+          template: 'assembled content',
+        },
+        pending: { src: 'file:./pending.json' },
+      },
+    };
+
+    mockFileFn.mockImplementation(async () => ({ loaded: true }));
+
+    const result = await getSrc({ workspace });
+
+    expect(result).toBe(workspace);
+    expect(mockFileFn).toHaveBeenCalledTimes(1);
+    expect(mockFileFn).toHaveBeenCalledWith('./pending.json');
+  });
+
+  it('resolves circular source references without fetching twice', async () => {
+    const workspace = { template: { src: 'file:./circular-first.json' } };
+
+    mockFileFn.mockImplementation(async (ref) => {
+      if (ref === './circular-first.json') {
+        return { nested: { src: 'file:./circular-second.json' } };
+      }
+
+      return { nested: { src: 'file:./circular-first.json' } };
+    });
+
+    const result = await getSrc({ workspace });
+
+    expect(result).toBe(workspace);
+    expect(mockFileFn).toHaveBeenCalledTimes(2);
+  });
+
   it('returns an error joining failed sources', async () => {
     const workspace = {
       templates: {
@@ -244,202 +269,3 @@ describe('getSrc: cache workspace sources', () => {
     expect(result.message).toBe('file:./failing.json: provider failed');
   });
 });
-
-describe('getSrc: cache sources to directory', () => {
-  it('writes all recursively discovered sources as static assets', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'xyz-source-cache-'));
-    temporaryDirectories.push(directory);
-
-    const firstSrc = 'https://example.com/first.json';
-    const secondSrc = 'https://example.com/second.json';
-    const workspace = {
-      templates: {
-        first: { src: firstSrc },
-        duplicate: { src: firstSrc },
-        local: { src: 'file:./local-template.json' },
-      },
-    };
-
-    const mockPool = mockAgent.get('https://example.com');
-
-    mockPool
-      .intercept({ path: '/first.json' })
-      .reply(200, { nested: { src: secondSrc } });
-    mockPool.intercept({ path: '/second.json' }).reply(200, {
-      query: 'SELECT 1',
-    });
-
-    mockFileFn.mockImplementation(async () => ({ local: true }));
-
-    const result = await getSrc({ workspace, directory });
-
-    expect(result).toBe(workspace);
-    expect(workspace.templates.first.src).toMatch(/^file:/);
-    expect(workspace.templates.duplicate.src).toBe(
-      workspace.templates.first.src,
-    );
-
-    // File sources are inspected for nested sources but are left unchanged without one.
-    expect(workspace.templates.local.src).toBe('file:./local-template.json');
-    expect(mockFileFn).toHaveBeenCalledTimes(1);
-    expect(mockFileFn).toHaveBeenCalledWith('./local-template.json');
-
-    const firstResponse = JSON.parse(
-      await readFile(filePath(workspace.templates.first.src), 'utf8'),
-    );
-    expect(firstResponse.nested.src).toMatch(/^file:/);
-
-    const secondResponse = JSON.parse(
-      await readFile(filePath(firstResponse.nested.src), 'utf8'),
-    );
-    expect(secondResponse).toEqual({ query: 'SELECT 1' });
-  });
-
-  it('inspects file sources without re-caching them', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'xyz-source-cache-'));
-    temporaryDirectories.push(directory);
-
-    const staticSrc = `file:${join(directory, 'static.json')}`;
-
-    const workspace = {
-      templates: {
-        static: { src: staticSrc },
-      },
-    };
-
-    mockFileFn.mockImplementation(async () => ({ local: true }));
-
-    const result = await getSrc({ workspace, directory });
-
-    expect(result).toBe(workspace);
-    expect(workspace.templates.static.src).toBe(staticSrc);
-    expect(mockFileFn).toHaveBeenCalledTimes(1);
-  });
-
-  it('materializes a file source whose response contains a remote source', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'xyz-source-cache-'));
-    temporaryDirectories.push(directory);
-
-    const workspace = {
-      templates: {
-        mid: { src: 'file:./mid.json' },
-      },
-    };
-
-    mockFileFn.mockImplementation(async () => ({
-      nested: { src: 'https://example.com/deep.json' },
-    }));
-
-    const mockPool = mockAgent.get('https://example.com');
-
-    mockPool.intercept({ path: '/deep.json' }).reply(200, {
-      query: 'SELECT deep',
-    });
-
-    const result = await getSrc({ workspace, directory });
-
-    expect(result).toBe(workspace);
-
-    // The file source response no longer matches the file on disk and must be written as a static asset.
-    expect(workspace.templates.mid.src).not.toBe('file:./mid.json');
-    expect(workspace.templates.mid.src).toMatch(/^file:/);
-
-    const midResponse = JSON.parse(
-      await readFile(filePath(workspace.templates.mid.src), 'utf8'),
-    );
-
-    expect(midResponse.nested.src).toMatch(/^file:/);
-    expect(midResponse.nested.src).not.toBe('https://example.com/deep.json');
-
-    const deepResponse = JSON.parse(
-      await readFile(filePath(midResponse.nested.src), 'utf8'),
-    );
-
-    expect(deepResponse).toEqual({ query: 'SELECT deep' });
-  });
-
-  it('materializes a chain of file sources nesting a remote source', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'xyz-source-cache-'));
-    temporaryDirectories.push(directory);
-
-    const workspace = {
-      templates: {
-        outer: { src: 'file:./outer.json' },
-      },
-    };
-
-    mockFileFn.mockImplementation(async (src) => {
-      if (src === './outer.json') {
-        return { inner: { src: 'file:./inner.json' } };
-      }
-
-      return { remote: { src: 'https://example.com/deepest.json' } };
-    });
-
-    const mockPool = mockAgent.get('https://example.com');
-
-    mockPool.intercept({ path: '/deepest.json' }).reply(200, {
-      query: 'SELECT deepest',
-    });
-
-    const result = await getSrc({ workspace, directory });
-
-    expect(result).toBe(workspace);
-
-    // The materialization must propagate up the chain of file sources.
-    expect(workspace.templates.outer.src).not.toBe('file:./outer.json');
-
-    const outerResponse = JSON.parse(
-      await readFile(filePath(workspace.templates.outer.src), 'utf8'),
-    );
-
-    expect(outerResponse.inner.src).not.toBe('file:./inner.json');
-
-    const innerResponse = JSON.parse(
-      await readFile(filePath(outerResponse.inner.src), 'utf8'),
-    );
-
-    expect(innerResponse.remote.src).toMatch(/^file:/);
-
-    const deepestResponse = JSON.parse(
-      await readFile(filePath(innerResponse.remote.src), 'utf8'),
-    );
-
-    expect(deepestResponse).toEqual({ query: 'SELECT deepest' });
-  });
-
-  it('rewrites circular remote references without fetching twice', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'xyz-source-cache-'));
-    temporaryDirectories.push(directory);
-
-    const firstSrc = 'https://example.com/circular-first.json';
-    const secondSrc = 'https://example.com/circular-second.json';
-    const workspace = { template: { src: firstSrc } };
-
-    const mockPool = mockAgent.get('https://example.com');
-
-    mockPool
-      .intercept({ path: '/circular-first.json' })
-      .reply(200, { nested: { src: secondSrc } });
-    mockPool
-      .intercept({ path: '/circular-second.json' })
-      .reply(200, { nested: { src: firstSrc } });
-
-    const result = await getSrc({ workspace, directory });
-
-    expect(result).toBe(workspace);
-
-    const firstResponse = JSON.parse(
-      await readFile(filePath(workspace.template.src), 'utf8'),
-    );
-    const secondResponse = JSON.parse(
-      await readFile(filePath(firstResponse.nested.src), 'utf8'),
-    );
-
-    expect(secondResponse.nested.src).toBe(workspace.template.src);
-  });
-});
-
-function filePath(src) {
-  return resolve(src.slice('file:'.length));
-}

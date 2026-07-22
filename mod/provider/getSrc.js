@@ -12,7 +12,6 @@ The module has a single getSrc export. The params determine the behaviour:
 - `{src, test: true}` checks whether a provider exists for the src reference.
 - `{clear: true}` flushes the source map.
 - `{workspace}` recursively discovers and caches every source in the workspace.
-- `{workspace, directory}` additionally writes every source response as a static asset and rewrites the src references to file sources. File sources are already local and are left unchanged unless their response nests a rewritten source reference.
 
 @requires /sign/file
 @requires /utils/envReplace
@@ -23,9 +22,6 @@ The module has a single getSrc export. The params determine the behaviour:
 @module /provider/getSrc
 */
 
-import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { extname, relative, resolve, sep } from 'node:path';
 import file_signer from '../sign/file.js';
 import envReplace from '../utils/envReplace.js';
 import logger from '../utils/logger.js';
@@ -67,7 +63,6 @@ The behaviour of the method is determined by the params. A string param is short
 @property {Boolean} [params.test] Returns whether a provider exists for the src reference.
 @property {Boolean} [params.clear] Flushes the source map.
 @property {Object} [params.workspace] Workspace to recursively discover and cache sources in.
-@property {String} [params.directory] Output directory for static source assets. Requires the workspace param.
 
 @returns {Promise<String|Object|Error>} Cloned source response.
 */
@@ -80,7 +75,7 @@ export default async function getSrc(params) {
   }
 
   if (params?.workspace) {
-    return cacheSources(params);
+    return cacheSources(params.workspace);
   }
 
   if (typeof params?.src !== 'string') {
@@ -170,220 +165,75 @@ Recursively discovers src properties in a workspace and in fetched responses. Ev
 
 All sources are fetched and inspected regardless of their provider. Sources nested in a source response, eg. a template src in a template, are discovered by inspecting the response.
 
-With a directory param each unique remote source response is written as a static asset and the src references are rewritten to file sources. File sources are already local and are left unchanged unless their response contains a rewritten source reference. Such a file source response no longer matches the file on disk and is itself written as a static asset.
+Objects with the srcLoaded flag have their source response assembled in the cached workspace and their src is not read.
 
-@param {Object} params
-@property {Object} params.workspace Workspace to scan.
-@property {String} [params.directory] Output directory for static source assets.
+@param {Object} workspace Workspace to scan.
 @returns {Promise<Object|Error>} Workspace or source discovery Error.
 */
-async function cacheSources(params) {
-  const directory = params.directory && resolve(params.directory);
-
-  const cachedSources = new Map();
+async function cacheSources(workspace) {
+  const inspectedSrcs = new Set();
   const inspectedObjects = new WeakSet();
   const errors = [];
-  let queue = [{ owner: null, value: params.workspace }];
+  let queue = [workspace];
 
   while (queue.length) {
-    const sourceRefs = new Map();
+    const sources = new Set();
 
-    queue.forEach(({ owner, value }) =>
-      collectSourceRefs(value, owner, sourceRefs, inspectedObjects, directory),
-    );
+    queue.forEach((value) => collectSrcs(value, sources, inspectedObjects));
 
-    const pendingSources = registerSources(
-      sourceRefs,
-      cachedSources,
-      directory,
-    );
+    // Calling getSrcPromise for the whole breadth starts every new request before any response is awaited.
+    const responses = Array.from(sources)
+      .filter((src) => !inspectedSrcs.has(src))
+      .map((src) => {
+        inspectedSrcs.add(src);
+        return [src, getSrcPromise(src)];
+      });
 
     queue = [];
 
-    // Every request in this breadth is already in the source map. Awaiting one at a time here does not serialize the provider requests.
-    for (const source of pendingSources) {
-      let response = await source.responsePromise;
+    for (const [src, responsePromise] of responses) {
+      const response = await responsePromise;
 
       if (response instanceof Error || response === undefined) {
         errors.push(
-          `${source.src}: ${response?.message || `Unable to load src: ${source.src}`}`,
+          `${src}: ${response?.message || `Unable to load src: ${src}`}`,
         );
         continue;
       }
 
-      if (directory) {
-        // The response is cloned to prevent src rewrites modifying the cached response.
-        response = cloneSource(response);
-        source.response = response;
-
-        // Remote sources are always written as static assets. File sources are only materialized when their response contains a rewritten source reference.
-        if (!source.fileSource) materializeSource(source, directory);
-      }
-
-      queue.push({ owner: source, value: response });
+      queue.push(response);
     }
   }
 
   if (errors.length) return new Error(errors.join('\n'));
 
-  if (directory && cachedSources.size) {
-    await mkdir(directory, { recursive: true });
-
-    await Promise.all(
-      Array.from(cachedSources.values())
-        .filter((source) => source.filePath)
-        .map((source) =>
-          writeFile(source.filePath, serializeResponse(source.response)),
-        ),
-    );
-  }
-
-  return params.workspace;
+  return workspace;
 }
 
 /**
-@function registerSources
+@function collectSrcs
 @description
-Registers the source references of a discovery breadth against the cachedSources Map. A pending source with its response promise is created for each src not yet cached.
+Recursively collects src properties from the value object and adds them to the sources Set. Inspected objects are tracked in the inspectedObjects WeakSet to avoid infinite recursion.
 
-References to an already materialized source are rewritten. References to a source not yet materialized are retained should the source be materialized later.
-
-@param {Map} sourceRefs Source references collected in the discovery breadth.
-@param {Map} cachedSources Sources cached in the discovery.
-@param {String} [directory] Output directory for static source assets.
-@returns {Array} Pending sources to be awaited.
-*/
-function registerSources(sourceRefs, cachedSources, directory) {
-  const pendingSources = [];
-
-  for (const [src, refs] of sourceRefs) {
-    const cachedSource = cachedSources.get(src);
-
-    if (cachedSource) {
-      if (cachedSource.fileSrc) {
-        // The source has been materialized. Later discovered references must be rewritten.
-        rewriteRefs(cachedSource, refs, directory);
-      } else {
-        // The references must be retained should the source be materialized later.
-        cachedSource.refs.push(...refs);
-      }
-      continue;
-    }
-
-    const pendingSource = {
-      fileSource: src.startsWith('file:'),
-      refs,
-      responsePromise: getSrcPromise(src),
-      src,
-    };
-
-    cachedSources.set(src, pendingSource);
-    pendingSources.push(pendingSource);
-  }
-
-  return pendingSources;
-}
-
-/**
-@function materializeSource
-@description
-Assigns a static asset file reference to a source and rewrites all its references. A file source response containing a rewritten reference no longer matches the file on disk and must be materialized itself.
-
-@param {Object} source Source to materialize.
-@param {String} directory Output directory for static source assets.
-*/
-function materializeSource(source, directory) {
-  // The source has already been materialized.
-  if (source.fileSrc) return;
-
-  source.filePath = staticFilePath(directory, source.src, source.response);
-  source.fileSrc = fileReference(source.filePath);
-  rewriteRefs(source, source.refs, directory);
-}
-
-/**
-@function rewriteRefs
-@description
-Rewrites source references to the static asset file reference of a materialized source. The owner of a rewritten reference is materialized if the owner is a file source.
-
-@param {Object} source Materialized source.
-@param {Array} refs References to rewrite.
-@param {String} directory Output directory for static source assets.
-*/
-function rewriteRefs(source, refs, directory) {
-  for (const { owner, ref } of refs) {
-    ref.src = source.fileSrc;
-
-    if (owner?.fileSource) materializeSource(owner, directory);
-  }
-}
-
-/**
-@function collectSourceRefs
-@description
-Recursively collects objects with a src property from the value object and maps them against their src in the sourceRefs Map. Inspected objects are tracked in the inspectedObjects WeakSet to avoid infinite recursion.
-
-Each collected reference records the owner source whose response contains the reference. References in the workspace itself have no owner.
-
-Src references are resolved in place with a directory param.
+The src of an object with the srcLoaded flag is not collected.
 
 @param {Object} value
-@param {Object} owner The source whose response is being inspected.
-@param {Map} sourceRefs
+@param {Set} sources
 @param {WeakSet} inspectedObjects
-@param {String} [directory] Output directory for static source assets.
 @returns {void}
 */
-function collectSourceRefs(
-  value,
-  owner,
-  sourceRefs,
-  inspectedObjects,
-  directory,
-) {
+function collectSrcs(value, sources, inspectedObjects) {
   if (!value || typeof value !== 'object') return;
   if (inspectedObjects.has(value)) return;
   inspectedObjects.add(value);
 
-  if (typeof value.src === 'string') {
-    // Src references are only resolved in place when the workspace is localized.
-    if (directory) value.src = envReplace(value.src);
-
-    const refs = sourceRefs.get(value.src) || [];
-    refs.push({ owner, ref: value });
-    sourceRefs.set(value.src, refs);
+  if (typeof value.src === 'string' && !value.srcLoaded) {
+    sources.add(value.src);
   }
 
   Object.values(value).forEach((item) =>
-    collectSourceRefs(item, owner, sourceRefs, inspectedObjects, directory),
+    collectSrcs(item, sources, inspectedObjects),
   );
-}
-
-function staticFilePath(directory, src, response) {
-  const hash = createHash('sha256').update(src).digest('hex').slice(0, 16);
-
-  if (typeof response === 'object' && response !== null) {
-    return resolve(directory, `${hash}.json`);
-  }
-
-  const sourcePath = src.slice(src.indexOf(':') + 1).split(/[?#]/)[0];
-  const extension = /^\.[a-zA-Z0-9]{1,10}$/.test(extname(sourcePath))
-    ? extname(sourcePath)
-    : '.txt';
-
-  return resolve(directory, `${hash}${extension}`);
-}
-
-function fileReference(filePath) {
-  let path = relative(process.cwd(), filePath).split(sep).join('/');
-  if (!path.startsWith('.')) path = `./${path}`;
-  return `file:${path}`;
-}
-
-function serializeResponse(response) {
-  return typeof response === 'object' && response !== null
-    ? `${JSON.stringify(response, null, 2)}\n`
-    : String(response);
 }
 
 function cloneSource(response) {
@@ -407,7 +257,7 @@ The fetch request will be created from the cloudfront provider module with the c
 */
 async function Cloudfront(ref) {
   if (!xyzEnv.KEY_CLOUDFRONT) {
-    return console.error('Cloudfront key is missing');
+    return new Error('Cloudfront key is missing');
   }
 
   const url = ref.split(':')[1];
