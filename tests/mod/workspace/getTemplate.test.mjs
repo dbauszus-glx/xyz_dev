@@ -102,10 +102,6 @@ describe('getTemplate', async () => {
   });
 
   it('templates sharing a src remain isolated', async () => {
-    // const { default: getTemplate } = await import(
-    //   '../../../mod/workspace/getTemplate.js'
-    // );
-
     const fooTemplate = {
       foo: true,
       src: 'file:./tests/assets/layers/template_test/layer.json',
