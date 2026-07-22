@@ -3,13 +3,13 @@
 The module exports the getTemplate method which is required by the query, languageTemplates, getLayer, and getLocale modules.
 
 @requires /workspace/cache
-@requires /workspace/srcMap
+@requires /provider/getSrc
 
 @module /workspace/getTemplate
 */
 
+import getSrc from '../provider/getSrc.js';
 import workspaceCache from './cache.js';
-import { getSource } from './srcMap.js';
 
 /**
 @global
@@ -40,10 +40,9 @@ one fetch.
 
 A module template will be created from the cached source response with the template.module flag.
 
-The source response will be composed into a clone of the template definition.
-Template definitions in workspace.templates remain unchanged.
+The source response will be composed into a clone of the template definition. The assembled template is loaded into the workspace.templates{} object with the srcLoaded flag. Repeat requests for the template are resolved from the workspace.templates{} object without reading the source again.
 
-A structured clone of the template will be returned to prevent the cached object being modified by role merges.
+A structured clone of the template will be returned to prevent the cached object being modified by role merges. Module templates are not loaded into the workspace.templates{} object.
 
 @param {string|object} template to be retrieved from workspace.templates if provided as string
 
@@ -52,8 +51,10 @@ A structured clone of the template will be returned to prevent the cached object
 export default async function getTemplate(template) {
   const workspace = await workspaceCache();
 
+  let templateKey;
+
   if (typeof template === 'string') {
-    const templateKey = String(template);
+    templateKey = String(template);
     // Protect from user provided input.
     if (/[^a-zA-Z0-9 :_-]/.exec(template)) {
       return new Error('Template key may only include whitelisted character.');
@@ -73,9 +74,19 @@ export default async function getTemplate(template) {
     return { ...template };
   }
 
-  const response = await getSource(template.src);
+  if (template.srcLoaded) {
+    // The source has been assembled into the workspace.templates{} object by a previous request.
+    const loadedTemplate = structuredClone(template);
 
-  // The error response is created by the getSource method.
+    // The srcLoaded flag is internal to the workspace.templates{} object.
+    delete loadedTemplate.srcLoaded;
+
+    return loadedTemplate;
+  }
+
+  const response = await getSrc(template.src);
+
+  // The error response is created by the getSrc method.
   if (response instanceof Error) {
     return response;
   }
@@ -94,6 +105,14 @@ export default async function getTemplate(template) {
 
   // TODO: decide whether key should be used for scoping.
   template.key ??= template.src.match(/([^\/]+$)/)[0];
+
+  if (templateKey) {
+    // Load the assembled template into the workspace.templates{} object so repeat requests do not read the source again.
+    workspace.templates[templateKey] = structuredClone({
+      ...template,
+      srcLoaded: true,
+    });
+  }
 
   // Prevent modification of cached template.
   return { ...template };

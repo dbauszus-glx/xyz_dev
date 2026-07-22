@@ -4,17 +4,16 @@ The module exports the cacheWorkspace method which returns a workspace from the 
 
 Default templates can be overwritten in the workspace or by providing a CUSTOM_TEMPLATES xyzEnvironment variable which references a JSON with templates to be merged into the workspace.
 
-@requires /provider/getFrom
+@requires /provider/getSrc
 @requires /utils/merge
 @requires /utils/processEnv
 
 @module /workspace/cache
 */
 
-import getFrom from '../provider/getFrom.js';
+import getSrc from '../provider/getSrc.js';
 import logger from '../utils/logger.js';
 import merge from '../utils/merge.js';
-import { cacheWorkspaceSources, srcMap } from './srcMap.js';
 
 let cache = null;
 let timestamp = Infinity;
@@ -78,10 +77,12 @@ The workspace is assigned to the module scope cache variable and the timestamp i
 @returns {workspace} JSON Workspace.
 */
 async function cacheWorkspace() {
-  const src = xyzEnv.WORKSPACE?.split(':')[0];
+  const hasProvider =
+    xyzEnv.WORKSPACE && (await getSrc({ src: xyzEnv.WORKSPACE, test: true }));
 
-  const workspace = Object.hasOwn(getFrom, src)
-    ? await getFrom[src](xyzEnv.WORKSPACE)
+  // The workspace must be fetched fresh on cache invalidation and bypasses the source map.
+  const workspace = hasProvider
+    ? await getSrc({ src: xyzEnv.WORKSPACE, cache: false })
     : {};
 
   if (workspace instanceof Error) {
@@ -90,9 +91,7 @@ async function cacheWorkspace() {
 
   const custom_templates =
     xyzEnv.CUSTOM_TEMPLATES &&
-    (await getFrom[xyzEnv.CUSTOM_TEMPLATES.split(':')[0]](
-      xyzEnv.CUSTOM_TEMPLATES,
-    ));
+    (await getSrc({ src: xyzEnv.CUSTOM_TEMPLATES, cache: false }));
 
   /**
   @function mark_template
@@ -153,9 +152,9 @@ async function cacheWorkspace() {
   cache = workspace;
 
   // Cached source responses may be stale after the workspace is rebuilt.
-  srcMap.clear();
+  await getSrc({ clear: true });
 
-  cacheWorkspaceSources(cache).then((result) => {
+  getSrc({ workspace: cache }).then((result) => {
     if (result instanceof Error) {
       // TODO needs test
       console.error(result);

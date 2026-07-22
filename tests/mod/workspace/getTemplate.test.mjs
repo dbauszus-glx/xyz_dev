@@ -1,6 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import getFrom from '../../../mod/provider/getFrom.js';
-import checkWorkspaceCache from '../../../mod/workspace/cache.js';
+
+// The file provider is mocked with an actual passthrough so single tests can assign a mock implementation.
+const mockFileFn = vi.fn();
+
+vi.mock('../../../mod/provider/file.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    default: (...args) =>
+      mockFileFn.getMockImplementation()
+        ? mockFileFn(...args)
+        : actual.default(...args),
+  };
+});
+
+const { default: checkWorkspaceCache } = await import(
+  '../../../mod/workspace/cache.js'
+);
 
 //Assigning console.error to a property to restore original function with.
 const originalConsole = console.error;
@@ -102,11 +117,52 @@ describe('getTemplate', async () => {
     expect(barResult.foo).toBeFalsy();
   });
 
+  it('loads the template source into workspace.templates for repeat requests', async () => {
+    const { default: getSrc } = await import('../../../mod/provider/getSrc.js');
+
+    const workspace = await checkWorkspaceCache();
+
+    workspace.templates.loaded_template = {
+      src: 'file:./tests/assets/loaded-template.json',
+    };
+
+    mockFileFn.mockImplementation(async () => ({
+      nested: { format: 'geojson' },
+    }));
+
+    try {
+      const first = await getTemplate('loaded_template');
+
+      expect(first.nested).toEqual({ format: 'geojson' });
+      expect(first.srcLoaded).toBeUndefined();
+
+      // The assembled template is loaded into the workspace.templates object.
+      expect(workspace.templates.loaded_template.srcLoaded).toBe(true);
+      expect(workspace.templates.loaded_template.nested).toEqual({
+        format: 'geojson',
+      });
+
+      // The source map is flushed to prove repeat requests are resolved from the workspace.templates object.
+      await getSrc({ clear: true });
+
+      // Modification of a requested template must not affect the loaded template.
+      first.nested.format = 'mutated';
+
+      const second = await getTemplate('loaded_template');
+
+      expect(second.nested).toEqual({ format: 'geojson' });
+      expect(second.srcLoaded).toBeUndefined();
+      expect(mockFileFn).toHaveBeenCalledTimes(1);
+    } finally {
+      mockFileFn.mockReset();
+      delete workspace.templates.loaded_template;
+    }
+  });
+
   it('shares one source promise between concurrent templates', async () => {
     const src = 'file:./tests/assets/concurrent-template.json';
-    const originalFile = getFrom.file;
 
-    getFrom.file = vi.fn(async () => {
+    mockFileFn.mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
       return { format: 'geojson' };
     });
@@ -119,9 +175,9 @@ describe('getTemplate', async () => {
 
       expect(foo).toMatchObject({ foo: true, format: 'geojson' });
       expect(bar).toMatchObject({ bar: true, format: 'geojson' });
-      expect(getFrom.file).toHaveBeenCalledTimes(1);
+      expect(mockFileFn).toHaveBeenCalledTimes(1);
     } finally {
-      getFrom.file = originalFile;
+      mockFileFn.mockReset();
     }
   });
 });
