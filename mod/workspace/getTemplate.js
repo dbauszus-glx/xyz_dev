@@ -64,6 +64,7 @@ export default async function getTemplate(template) {
       return new Error(`Template: ${template} not found.`);
     }
 
+    // Must be spread to prevent crash on cloning methods of the template object.
     template = { ...workspace.templates[template] };
     template.key = templateKey;
   } else {
